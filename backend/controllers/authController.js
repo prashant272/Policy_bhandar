@@ -133,8 +133,8 @@ exports.completeProfile = async (req, res) => {
 
     user.state = state || user.state;
     user.city = city || user.city;
-    user.selectedCategoryId = selectedCategoryId || user.selectedCategoryId;
-    user.selectedSubcategoryId = selectedSubcategoryId || user.selectedSubcategoryId;
+    user.selectedCategoryId = selectedCategoryId === '' ? null : (selectedCategoryId || user.selectedCategoryId);
+    user.selectedSubcategoryId = selectedSubcategoryId === '' ? null : (selectedSubcategoryId || user.selectedSubcategoryId);
     user.occupationType = occupationType || user.occupationType;
     user.company = company || user.company;
     user.designation = designation || user.designation;
@@ -248,7 +248,9 @@ exports.updateProfile = async (req, res) => {
     
     const updateData = { 
       name, mobile, email, company, occupationType, designation, 
-      state, city, selectedCategoryId, selectedSubcategoryId 
+      state, city,
+      selectedCategoryId: selectedCategoryId === '' ? null : selectedCategoryId,
+      selectedSubcategoryId: selectedSubcategoryId === '' ? null : selectedSubcategoryId
     };
 
     if (req.file) {
