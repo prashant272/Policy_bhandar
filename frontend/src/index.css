@@ -1,0 +1,435 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+:root {
+  font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+  background-color: #ffffff;
+  color: #0f172a;
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: #0f172a;
+  background: radial-gradient(circle at top right, rgba(249, 115, 22, 0.08), transparent 500px),
+              radial-gradient(circle at bottom left, rgba(234, 88, 12, 0.05), transparent 500px),
+              #f8fafc;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Premium Utilities */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #0f172a !important;
+}
+
+.glass-card {
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  transition: all 0.5s ease-in-out;
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 1rem !important;
+  color: #ffffff !important;
+  transition: all 0.3s ease !important;
+}
+
+.glass-input:focus {
+  border-color: #fb923c !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.2) !important;
+  outline: none !important;
+}
+
+.glass-effect-hover:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(249, 115, 22, 0.3) !important;
+  box-shadow: 0 10px 30px -10px rgba(249, 115, 22, 0.15) !important;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 50%, #facc15 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.bg-gradient-premium {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%) !important;
+}
+
+.bg-gradient-premium-hover:hover {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important;
+}
+
+/* ==========================================================================
+   GLOBAL LIGHT MODE STYLING OVERRIDES FOR PREMIUM ORANGE & WHITE THEME
+   ========================================================================== */
+
+/* Typography & General Colors */
+body, p, span, h1, h2, h3, h4, h5, h6 {
+  color: #1e293b;
+}
+
+/* Remap white text to Slate 900 globally for light panels, but keep it white inside dark containers */
+.text-white {
+  color: #0f172a; /* Slate 900 */
+}
+.text-gray-300 {
+  color: #334155; /* Slate 700 */
+}
+.text-gray-400 {
+  color: #475569; /* Slate 600 */
+}
+.text-gray-500 {
+  color: #64748b; /* Slate 500 */
+}
+
+/* Overriding links in Navbar and sidebars */
+a.text-gray-300:hover, button.text-gray-300:hover {
+  color: #ea580c; /* Orange hover */
+}
+.hover\:text-white:hover {
+  color: #ea580c;
+}
+.hover\:text-gray-200:hover {
+  color: #1e293b;
+}
+
+/* Form Inputs, Select Dropdowns, Textareas in Light Mode */
+input, select, textarea {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: #f97316;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
+}
+input::placeholder {
+  color: #94a3b8;
+}
+
+/* Tables Styling overrides */
+table {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+}
+thead tr {
+  background-color: #f1f5f9 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+thead th {
+  color: #475569 !important;
+  font-weight: 700 !important;
+}
+tbody tr:hover {
+  background-color: rgba(249, 115, 22, 0.03) !important;
+}
+
+/* Sidebar Light Mode Styling Override */
+aside {
+  background-color: #f1f5f9 !important; /* Soft Slate 100 Sidebar */
+  border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+aside .text-white {
+  color: #0f172a !important;
+}
+aside button {
+  color: #475569 !important;
+}
+aside button:hover {
+  background-color: rgba(249, 115, 22, 0.05) !important;
+  color: #ea580c !important;
+}
+aside button.bg-gradient-premium {
+  color: #ffffff !important; /* Keep active text white over orange background */
+}
+aside button.bg-gradient-premium svg {
+  color: #ffffff !important;
+}
+
+/* Overriding borders */
+.border-white\/5, .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+.divide-white\/5 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Overriding Background Utilities for Light Panels */
+.bg-slate-900, .bg-slate-950\/40 {
+  background-color: #ffffff;
+}
+.bg-white\/3, .bg-white\/5 {
+  background-color: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+.bg-indigo-600\/10 {
+  background-color: rgba(249, 115, 22, 0.1);
+  color: #ea580c;
+}
+.hover\:bg-white\/3:hover, .hover\:bg-white\/5:hover {
+  background-color: rgba(249, 115, 22, 0.04);
+}
+
+/* Brand overrides (Indigo & Purple -> Orange & Amber) */
+.text-indigo-400, .text-indigo-500, .text-purple-400, .text-purple-300 {
+  color: #ea580c;
+}
+.bg-indigo-600 {
+  background-color: #f97316;
+}
+.border-indigo-500\/30 {
+  border-color: rgba(249, 115, 22, 0.3);
+}
+.bg-indigo-600\/30 {
+  background-color: rgba(249, 115, 22, 0.1);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+/* Dropdown flyout adjustments for Navbar in light mode */
+.relative.group\/cat .absolute, .relative.group\/sub .absolute {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Footer & Creator Card overrides */
+footer {
+  background-color: #f8fafc !important;
+  border-top-color: rgba(0, 0, 0, 0.08) !important;
+}
+.from-indigo-950 {
+  --tw-gradient-from: #f97316 !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(249, 115, 22, 0)) !important;
+}
+.via-\[\#0b1021\] {
+  --tw-gradient-stops: var(--tw-gradient-from), #ea580c !important;
+}
+.to-purple-950 {
+  --tw-gradient-to: #c2410c !important;
+}
+
+/* ==========================================================================
+   DARK SECTION PRESERVATION RULES (FOR CINEMATIC HERO & FOOTER CARD)
+   ========================================================================== */
+
+section.bg-slate-950,
+section.bg-slate-950 *,
+.bg-gradient-to-r.from-indigo-950,
+.bg-gradient-to-r.from-indigo-950 * {
+  /* Do not force light mode colors inside dark layouts */
+}
+
+section.bg-slate-950 .text-white,
+section.bg-slate-950 h1,
+section.bg-slate-950 h2,
+section.bg-slate-950 h3,
+section.bg-slate-950 h4,
+section.bg-slate-950 h5,
+section.bg-slate-950 h6,
+.bg-gradient-to-r.from-indigo-950 .text-white,
+.bg-gradient-to-r.from-indigo-950 h1,
+.bg-gradient-to-r.from-indigo-950 h2,
+.bg-gradient-to-r.from-indigo-950 h3,
+.bg-gradient-to-r.from-indigo-950 h4,
+.admin-dark-mode,
+.admin-dark-mode *,
+.admin-dark-mode h1,
+.admin-dark-mode h2,
+.admin-dark-mode h3,
+.admin-dark-mode h4,
+.admin-dark-mode h5,
+.admin-dark-mode h6,
+.admin-dark-mode .text-white {
+  color: #ffffff !important;
+}
+
+section.bg-slate-950 p,
+section.bg-slate-950 span,
+.bg-gradient-to-r.from-indigo-950 p,
+.bg-gradient-to-r.from-indigo-950 span,
+.admin-dark-mode p:not(.glass-input),
+.admin-dark-mode span:not(.glass-badge) {
+  color: #e2e8f0 !important; /* Soft white/silver */
+}
+
+section.bg-slate-950 select,
+section.bg-slate-950 input,
+section.bg-slate-950 textarea,
+.admin-dark-mode select,
+.admin-dark-mode input,
+.admin-dark-mode textarea {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+section.bg-slate-950 select option,
+.admin-dark-mode select option {
+  background-color: #0b0f19 !important;
+  color: #ffffff !important;
+}
+
+section.bg-slate-950 select:focus,
+section.bg-slate-950 input:focus,
+section.bg-slate-950 textarea:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 1px #f59e0b !important;
+}
+
+section.bg-slate-950 .bg-white\/5,
+.admin-dark-mode .bg-white\/5,
+.admin-dark-mode .bg-white\/3 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Fix Admin Panel Specifics */
+.admin-dark-mode aside {
+  background-color: rgba(15, 23, 42, 0.4) !important; /* Dark sidebar */
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+.admin-dark-mode table {
+  background-color: transparent !important;
+}
+.admin-dark-mode thead tr {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+.admin-dark-mode thead th {
+  color: #94a3b8 !important;
+}
+.admin-dark-mode tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+.admin-dark-mode .text-gray-400 {
+  color: #94a3b8 !important;
+}
+.admin-dark-mode .text-gray-300 {
+  color: #cbd5e1 !important;
+}
+.admin-dark-mode button {
+  color: inherit !important;
+}
+.admin-dark-mode .glass-effect {
+  background: rgba(15, 23, 42, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+section.bg-slate-950 .text-amber-400 {
+  color: #fbbf24 !important; /* Maintain vibrant gold/amber */
+}
+
+/* ==========================================================================
+   TRANSPARENT HEADER OVERLAY (HOME PAGE NAV SPECIFIC)
+   ========================================================================== */
+
+nav.absolute.bg-transparent {
+  background-color: transparent !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+}
+
+nav.absolute.bg-transparent *,
+nav.absolute.bg-transparent a,
+nav.absolute.bg-transparent button,
+nav.absolute.bg-transparent span {
+  color: #ffffff !important;
+}
+
+nav.absolute.bg-transparent a:hover,
+nav.absolute.bg-transparent button:hover {
+  color: #fb923c !important; /* Soft orange on hover */
+}
+
+/* ==========================================================================
+   SGS-GROUP VIEWPORT METROPOLIS GLASSMORPHISM SPECIFIC OVERRIDES
+   ========================================================================== */
+
+#hero-quick-form .glass-card {
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(25px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.8) !important;
+  border-radius: 2.5rem !important;
+}
+
+#hero-quick-form .glass-input {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 1rem !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  padding: 1rem 1.5rem !important;
+  transition: all 0.3s ease !important;
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+#hero-quick-form .glass-input:focus {
+  border-color: #fb923c !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.2) !important;
+  outline: none !important;
+}
+
+#hero-quick-form select.glass-input {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+}
+
+#hero-quick-form select.glass-input option {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+/* Horizontal Thin Trust Badges */
+.glass-badge {
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 0.75rem !important;
+  padding: 0.75rem 1rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  transition: all 0.3s ease !important;
+}
+
+.glass-badge:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}

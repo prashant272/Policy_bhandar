@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Policybhandar</title>
+    <!-- <style>
+      /* Prevent text selection and drag */
+      body {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      img {
+        -webkit-user-drag: none;
+      }
+    </style>
+    <script>
+      // Block Right Click (Context Menu)
+      document.addEventListener('contextmenu', event => event.preventDefault());
+
+      // Block common DevTools shortcuts & Print Screen
+      document.addEventListener('keydown', (e) => {
+        // F12
+        if (e.key === 'F12' || e.keyCode === 123) {
+          e.preventDefault();
+        }
+        // Ctrl+Shift+I / J / C (Inspect/Console/Element)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
+          e.preventDefault();
+        }
+        // Ctrl+U (View Source)
+        if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) {
+          e.preventDefault();
+        }
+        // Print Screen (PrtScn)
+        if (e.key === 'PrintScreen') {
+          navigator.clipboard.writeText(''); // Attempt to clear clipboard
+          e.preventDefault();
+        }
+        
+        // Mac Screenshot Shortcuts (Cmd+Shift+3, Cmd+Shift+4, Cmd+Shift+5)
+        if (e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === '5')) {
+          navigator.clipboard.writeText('');
+          e.preventDefault();
+        }
+      });
+      
+      // Handle Print Screen release just in case
+      document.addEventListener('keyup', (e) => {
+        if (e.key === 'PrintScreen' || (e.metaKey && e.shiftKey)) {
+          navigator.clipboard.writeText('');
+        }
+      });
+
+      // Advanced Deterrent: Blur screen when window loses focus 
+      // (Snipping tools and some screen recorders cause the window to lose focus)
+      window.addEventListener('blur', () => {
+        document.body.style.filter = 'blur(20px) grayscale(100%)';
+        document.body.style.opacity = '0.01';
+      });
+
+      window.addEventListener('focus', () => {
+        document.body.style.filter = 'none';
+        document.body.style.opacity = '1';
+      });
+
+      // Extra layer for Mobile (Recent Apps / Backgrounding)
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden || document.visibilityState === 'hidden') {
+          document.body.style.filter = 'blur(20px) grayscale(100%)';
+          document.body.style.opacity = '0.01';
+        } else {
+          document.body.style.filter = 'none';
+          document.body.style.opacity = '1';
+        }
+      });
+    </script> -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
