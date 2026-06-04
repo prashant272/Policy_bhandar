@@ -201,7 +201,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    if (!user.isVerified) {
+    if (!user.isVerified && user.role !== 'SuperAdmin') {
        return res.status(403).json({
          success: false,
          error: 'Please verify your account first. Use the registration flow to verify your number.',
