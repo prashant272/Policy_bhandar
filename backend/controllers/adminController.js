@@ -60,15 +60,35 @@ exports.uploadMaterial = async (req, res) => {
       // Multer file upload to Cloudflare R2 or local filesystem fallback
       fileUrl = await uploadFile(req.file);
       // In a real app, generate thumbnails. For MVP, use fileUrl if it is an image
-      thumbnail = fileUrl;
+      if (req.file.mimetype.startsWith('image/') && !req.file.mimetype.includes('svg')) {
+        thumbnail = fileUrl;
+      } else {
+        if (type === 'PPT') {
+          thumbnail = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=400';
+        } else if (type === 'PDF' || type === 'Brochure') {
+          thumbnail = 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=400';
+        } else if (type === 'Reel' || type === 'Video') {
+          thumbnail = 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=400';
+        } else {
+          thumbnail = fileUrl;
+        }
+      }
     }
 
     if (!fileUrl) {
       return res.status(400).json({ success: false, error: 'Please upload a file or provide fileUrl' });
     }
 
-    if (!thumbnail) {
-      thumbnail = 'https://via.placeholder.com/150'; // default thumbnail
+    if (!thumbnail || thumbnail === 'https://via.placeholder.com/150') {
+      if (type === 'PPT') {
+        thumbnail = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=400';
+      } else if (type === 'PDF' || type === 'Brochure') {
+        thumbnail = 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=400';
+      } else if (type === 'Reel' || type === 'Video') {
+        thumbnail = 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=400';
+      } else {
+        thumbnail = 'https://via.placeholder.com/150'; // default thumbnail fallback
+      }
     }
 
     const parsedTags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : tags;
@@ -215,10 +235,33 @@ exports.updateMaterial = async (req, res) => {
 
     if (req.file) {
       updateData.fileUrl = await uploadFile(req.file);
-      updateData.thumbnail = updateData.fileUrl; // MVP behavior
+      if (req.file.mimetype.startsWith('image/') && !req.file.mimetype.includes('svg')) {
+        updateData.thumbnail = updateData.fileUrl;
+      } else {
+        if (type === 'PPT') {
+          updateData.thumbnail = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=400';
+        } else if (type === 'PDF' || type === 'Brochure') {
+          updateData.thumbnail = 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=400';
+        } else if (type === 'Reel' || type === 'Video') {
+          updateData.thumbnail = 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=400';
+        } else {
+          updateData.thumbnail = updateData.fileUrl;
+        }
+      }
     } else {
       if (fileUrl) updateData.fileUrl = fileUrl;
-      if (thumbnail) updateData.thumbnail = thumbnail;
+      if (thumbnail) {
+        updateData.thumbnail = thumbnail;
+      } else if (!material.thumbnail || material.thumbnail === 'https://via.placeholder.com/150' || material.thumbnail === material.fileUrl) {
+        // If updating type without a thumbnail, or the old thumbnail was just the file url of a non-image file, update it to a proper default
+        if (type === 'PPT') {
+          updateData.thumbnail = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=400';
+        } else if (type === 'PDF' || type === 'Brochure') {
+          updateData.thumbnail = 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=400';
+        } else if (type === 'Reel' || type === 'Video') {
+          updateData.thumbnail = 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=400';
+        }
+      }
     }
 
     material = await Material.findByIdAndUpdate(req.params.id, updateData, { new: true });

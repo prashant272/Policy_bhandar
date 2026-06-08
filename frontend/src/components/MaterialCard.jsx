@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AuthContext } from '../context/AuthContext';
 import API from '../services/api';
 import { watermarkImage } from '../utils/watermark';
+import { watermarkPDF } from '../utils/pdfWatermark';
 import { Download, Eye, ShieldAlert, Sparkles, FileText, Video, Image as ImageIcon, FileCheck, X } from 'lucide-react';
 
 export default function MaterialCard({ material, onOpenAuthModal, onDownloadSuccess }) {
@@ -29,8 +30,11 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
   const getIcon = () => {
     switch (material.type) {
       case 'Banner': return <ImageIcon className="text-blue-400" size={16} />;
-      case 'Reel': return <Video className="text-pink-400" size={16} />;
-      case 'PDF': return <FileText className="text-red-400" size={16} />;
+      case 'Reel':
+      case 'Video': return <Video className="text-pink-400" size={16} />;
+      case 'PDF':
+      case 'Brochure': return <FileText className="text-red-400" size={16} />;
+      case 'PPT': return <FileCheck className="text-orange-400" size={16} />;
       default: return <FileCheck className="text-indigo-400" size={16} />;
     }
   };
@@ -60,9 +64,23 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
             console.error('Watermarking failed, downloading raw file', err);
             triggerDownload(material.fileUrl, `${material.title}.jpg`);
           }
+        } else if (material.type === 'PDF' || material.type === 'Brochure') {
+          try {
+            const downloadUrl = fileUrl.startsWith('/uploads') 
+              ? `${window.location.protocol}//${window.location.hostname}:5000${fileUrl}` 
+              : fileUrl;
+            const watermarkedPdfUrl = await watermarkPDF(downloadUrl, user);
+            triggerDownload(watermarkedPdfUrl, `${material.title}-watermarked.pdf`);
+          } catch (err) {
+            console.error('PDF Watermarking failed, downloading raw file', err);
+            triggerDownload(fileUrl, `${material.title}.pdf`);
+          }
         } else {
-          // For Reel or PDF: Download raw file URL directly (MVP)
-          triggerDownload(fileUrl, `${material.title}-${material.type}`);
+          // Prepend API host if it is a local upload path
+          const downloadUrl = fileUrl.startsWith('/uploads') 
+            ? `${window.location.protocol}//${window.location.hostname}:5000${fileUrl}` 
+            : fileUrl;
+          triggerDownload(downloadUrl, `${material.title}-${material.type}.mp4`);
         }
 
         if (onDownloadSuccess) {
@@ -295,11 +313,33 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
         onClick={() => setPreviewOpen(true)}
         className="relative aspect-video w-full overflow-hidden bg-slate-950 cursor-pointer group/thumb"
       >
-        <img
-          src={material.thumbnail}
-          alt={material.title}
-          className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
-        />
+        { (material.type === 'Reel' || material.type === 'Video') ? (
+          <video
+            src={material.fileUrl}
+            muted
+            playsInline
+            preload="none"
+            className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
+            onMouseEnter={e => e.target.play().catch(err => {})}
+            onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0; }}
+          />
+        ) : (material.type === 'PDF' || material.type === 'Brochure' || material.type === 'PPT') ? (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-[#0d1326] border border-white/5 p-4 text-center group-hover/thumb:scale-105 transition-transform duration-500">
+            {material.type === 'PPT' ? (
+              <FileCheck className="text-orange-400 mb-1.5" size={36} />
+            ) : (
+              <FileText className="text-red-400 mb-1.5" size={36} />
+            )}
+            <span className="text-xs font-semibold text-gray-300 line-clamp-1 px-1">{material.title}</span>
+            <span className="text-[9px] text-gray-500 uppercase font-bold mt-1 tracking-wider">{material.type} Document</span>
+          </div>
+        ) : (
+          <img
+            src={material.thumbnail}
+            alt={material.title}
+            className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
+          />
+        )}
 
         {/* Premium Tag */}
         {material.isPremium && (
@@ -385,18 +425,26 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
               {material.type === 'Banner' && (
                 <img src={previewUrl} alt={material.title} className="max-w-full max-h-full object-contain drop-shadow-2xl" />
               )}
-              {material.type === 'Reel' && (
+              {(material.type === 'Reel' || material.type === 'Video') && (
                 <div className="relative h-full max-w-full inline-block">
                   <video src={material.fileUrl} controls autoPlay loop className="max-h-full object-contain" />
                   
-                  {/* HTML Overlay Watermark for Reels (Preview Only) */}
-                  {renderHTMLOverlay(false)}
+                  {/* HTML Overlay Watermark for Reels/Videos (Preview Only) */}
+                  {material.type === 'Reel' && renderHTMLOverlay(false)}
                 </div>
               )}
-              {material.type === 'PDF' && (
+              {(material.type === 'PDF' || material.type === 'Brochure') && (
                 <div className="text-center p-6 space-y-4">
                   <FileText className="mx-auto text-indigo-500" size={80} />
-                  <p className="text-base text-gray-300 max-w-md">Brochure / PDF document.</p>
+                  <p className="text-base text-gray-300 max-w-md">{material.title}</p>
+                  <p className="text-xs text-gray-500">Brochure / PDF document. Click Download to get the file.</p>
+                </div>
+              )}
+              {material.type === 'PPT' && (
+                <div className="text-center p-6 space-y-4">
+                  <FileCheck className="mx-auto text-orange-500" size={80} />
+                  <p className="text-base text-gray-300 max-w-md">{material.title}</p>
+                  <p className="text-xs text-gray-500">PPT Presentation slides. Click Download to get the presentation file.</p>
                 </div>
               )}
             </div>

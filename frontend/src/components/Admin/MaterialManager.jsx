@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import API from '../../services/api';
-import { LayoutGrid, Upload, Edit, Trash2, X, Plus, Image, ShieldAlert, Sparkles } from 'lucide-react';
+import { LayoutGrid, Upload, Edit, Trash2, X, Plus, Image, ShieldAlert, Sparkles, FileText, FileCheck } from 'lucide-react';
 
 // Tree helpers for nested subcategories
 const buildSubcategoryTree = (items, parentId = null) => {
@@ -395,7 +395,17 @@ export default function MaterialManager() {
                 {materials.map((mat) => (
                   <tr key={mat._id} className="hover:bg-white/3 transition-colors">
                     <td className="p-4 font-bold text-white flex items-center space-x-3">
-                      {mat.thumbnail ? (
+                      {mat.type === 'Reel' || mat.type === 'Video' ? (
+                        <video src={mat.fileUrl} muted preload="none" className="w-10 h-6 object-cover rounded border border-white/10" />
+                      ) : mat.type === 'PDF' || mat.type === 'Brochure' || mat.type === 'PPT' ? (
+                        <div className="w-10 h-6 bg-slate-900 border border-white/10 rounded flex items-center justify-center">
+                          {mat.type === 'PPT' ? (
+                            <FileCheck className="text-orange-400" size={12} />
+                          ) : (
+                            <FileText className="text-red-400" size={12} />
+                          )}
+                        </div>
+                      ) : mat.thumbnail ? (
                         <img src={mat.thumbnail} alt="" className="w-10 h-6 object-cover rounded border border-white/10" />
                       ) : (
                         <div className="w-10 h-6 bg-slate-900 border border-white/10 rounded flex items-center justify-center text-gray-600">

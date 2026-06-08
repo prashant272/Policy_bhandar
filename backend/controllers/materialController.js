@@ -2,6 +2,9 @@ const Material = require('../models/Material');
 const Category = require('../models/Category');
 const Subcategory = require('../models/Subcategory');
 const User = require('../models/User');
+const { watermarkVideo } = require('../utils/videoWatermark');
+const path = require('path');
+const fs = require('fs');
 
 // @desc    Get all categories
 // @route   GET /api/materials/categories
@@ -68,7 +71,13 @@ exports.getMaterials = async (req, res) => {
         query.subcategoryId = subcategoryId;
       }
     }
-    if (type) query.type = type;
+    if (type) {
+      if (type.includes(',')) {
+        query.type = { $in: type.split(',') };
+      } else {
+        query.type = type;
+      }
+    }
     if (tag) query.tags = tag;
     if (companyName) query.companyName = { $regex: companyName, $options: 'i' };
     
@@ -215,11 +224,30 @@ exports.downloadMaterial = async (req, res) => {
       }
     }
 
+    let finalFileUrl = material.fileUrl;
+
+    if (material.type === 'Reel' || material.type === 'Video') {
+      try {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const outputFilename = `watermarked-${uniqueSuffix}.mp4`;
+        const outputPath = path.join(__dirname, '../../uploads', outputFilename);
+        
+        const downloadUrl = material.fileUrl.startsWith('/uploads')
+          ? `${req.protocol}://${req.get('host')}${material.fileUrl}`
+          : material.fileUrl;
+        
+        await watermarkVideo(downloadUrl, user, outputPath);
+        finalFileUrl = `/uploads/${outputFilename}`;
+      } catch (err) {
+        console.error('Video watermarking failed, serving raw file:', err);
+      }
+    }
+
     // Response includes confirmation and the file URL for downloading
     res.status(200).json({
       success: true,
       data: {
-        fileUrl: material.fileUrl,
+        fileUrl: finalFileUrl,
         type: material.type,
         title: material.title,
         downloadCount: user.downloadCount,
