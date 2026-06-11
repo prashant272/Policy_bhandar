@@ -9,13 +9,13 @@ const { uploadFile } = require('../config/r2');
 // @access  Private (SuperAdmin, SubAdmin)
 exports.createCategory = async (req, res) => {
   try {
-    const { name, icon } = req.body;
+    const { name, icon, isClickable } = req.body;
 
     if (!name) {
       return res.status(400).json({ success: false, error: 'Please provide category name' });
     }
 
-    const category = await Category.create({ name, icon });
+    const category = await Category.create({ name, icon, isClickable });
     res.status(201).json({ success: true, data: category });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -27,7 +27,7 @@ exports.createCategory = async (req, res) => {
 // @access  Private (SuperAdmin, SubAdmin)
 exports.createSubcategory = async (req, res) => {
   try {
-    const { categoryId, parentSubcategoryId, name } = req.body;
+    const { categoryId, parentSubcategoryId, name, isClickable } = req.body;
 
     if (!categoryId || !name) {
       return res.status(400).json({ success: false, error: 'Please provide categoryId and subcategory name' });
@@ -36,7 +36,8 @@ exports.createSubcategory = async (req, res) => {
     const subcategory = await Subcategory.create({
       categoryId,
       parentSubcategoryId: parentSubcategoryId || null,
-      name
+      name,
+      isClickable
     });
     res.status(201).json({ success: true, data: subcategory });
   } catch (err) {
@@ -350,6 +351,54 @@ exports.deleteSubcategory = async (req, res) => {
     await Subcategory.deleteMany({ _id: { $in: targetIds } });
 
     res.status(200).json({ success: true, message: 'Subcategory and all nested subcategories/materials deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Update Category
+// @route   PUT /api/admin/categories/:id
+// @access  Private (SuperAdmin, SubAdmin)
+exports.updateCategory = async (req, res) => {
+  try {
+    const { name, icon, isClickable } = req.body;
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ success: false, error: 'Category not found' });
+    }
+
+    if (name) category.name = name;
+    if (icon !== undefined) category.icon = icon;
+    if (isClickable !== undefined) category.isClickable = isClickable;
+
+    await category.save();
+    res.status(200).json({ success: true, data: category });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Update Subcategory
+// @route   PUT /api/admin/subcategories/:id
+// @access  Private (SuperAdmin, SubAdmin)
+exports.updateSubcategory = async (req, res) => {
+  try {
+    const { name, parentSubcategoryId, isClickable } = req.body;
+    const subcategory = await Subcategory.findById(req.params.id);
+    if (!subcategory) {
+      return res.status(404).json({ success: false, error: 'Subcategory not found' });
+    }
+
+    if (name) subcategory.name = name;
+    
+    if (parentSubcategoryId !== undefined) {
+      subcategory.parentSubcategoryId = parentSubcategoryId || null;
+    }
+    
+    if (isClickable !== undefined) subcategory.isClickable = isClickable;
+
+    await subcategory.save();
+    res.status(200).json({ success: true, data: subcategory });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

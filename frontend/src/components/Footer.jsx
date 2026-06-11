@@ -10,12 +10,20 @@ const FooterCategoryItem = ({ category }) => {
   return (
     <li className="flex flex-col">
       <div className="flex items-center justify-between group">
-        <Link 
-          to={`/category/${category._id}`} 
-          className="text-sm text-slate-700 font-bold hover:text-orange-500 inline-block transition-colors"
-        >
-          {category.name}
-        </Link>
+        {category.isClickable !== false ? (
+          <Link 
+            to={`/category/${category._id}`} 
+            className="text-sm text-slate-700 font-bold hover:text-orange-500 inline-block transition-colors"
+          >
+            {category.name}
+          </Link>
+        ) : (
+          <span 
+            className="text-sm text-slate-400 font-bold inline-block cursor-default"
+          >
+            {category.name}
+          </span>
+        )}
         {hasSubcategories && (
           <button 
             onClick={() => setIsOpen(!isOpen)}
@@ -32,12 +40,20 @@ const FooterCategoryItem = ({ category }) => {
           <ul className="pl-3 border-l border-slate-200 space-y-2 py-1">
             {category.subcategories.map(sub => (
               <li key={sub._id}>
-                <Link 
-                  to={`/category/${category._id}?subcat=${sub._id}`}
-                  className="text-xs text-slate-600 font-bold hover:text-orange-500 inline-block transition-colors"
-                >
-                  {sub.name}
-                </Link>
+                {sub.isClickable !== false ? (
+                  <Link 
+                    to={`/category/${category._id}?subcat=${sub._id}`}
+                    className="text-xs text-slate-600 font-bold hover:text-orange-500 inline-block transition-colors"
+                  >
+                    {sub.name}
+                  </Link>
+                ) : (
+                  <span 
+                    className="text-xs text-slate-400 font-bold inline-block cursor-default"
+                  >
+                    {sub.name}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

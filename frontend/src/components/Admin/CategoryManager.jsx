@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import API from '../../services/api';
-import { Plus, FolderPlus, Trash2, X, FolderTree, Tag, Info, Folder } from 'lucide-react';
+import { Plus, FolderPlus, Trash2, X, FolderTree, Tag, Info, Folder, Edit } from 'lucide-react';
 
 // Tree helpers for nested subcategories
 const buildSubcategoryTree = (items, parentId = null) => {
@@ -45,6 +45,10 @@ export default function CategoryManager() {
   const [categoryForm, setCategoryForm] = useState({ name: '', icon: 'heartPulse', isClickable: true });
   const [subcatForm, setSubcatForm] = useState({ categoryId: '', parentSubcategoryId: '', name: '', isClickable: true });
 
+  // Editing States
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editingSubcategoryId, setEditingSubcategoryId] = useState(null);
+
   // Fetch Categories
   const fetchCategories = async () => {
     try {
@@ -81,7 +85,9 @@ export default function CategoryManager() {
   useEffect(() => {
     if (selectedCategoryId) {
       fetchSubcategories(selectedCategoryId);
-      setSubcatForm(prev => ({ ...prev, categoryId: selectedCategoryId, parentSubcategoryId: '' }));
+      if (!editingSubcategoryId) {
+        setSubcatForm(prev => ({ ...prev, categoryId: selectedCategoryId, parentSubcategoryId: '' }));
+      }
     } else {
       setSubcategories([]);
     }
@@ -93,14 +99,24 @@ export default function CategoryManager() {
     setLoading(true);
     setMessage('');
     try {
-      const res = await API.post('/admin/categories', categoryForm);
-      if (res.data.success) {
-        setMessage('Success: Category created successfully!');
-        setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true });
-        await fetchCategories();
+      if (editingCategoryId) {
+        const res = await API.put(`/admin/categories/${editingCategoryId}`, categoryForm);
+        if (res.data.success) {
+          setMessage('Success: Category updated successfully!');
+          setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true });
+          setEditingCategoryId(null);
+          await fetchCategories();
+        }
+      } else {
+        const res = await API.post('/admin/categories', categoryForm);
+        if (res.data.success) {
+          setMessage('Success: Category created successfully!');
+          setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true });
+          await fetchCategories();
+        }
       }
     } catch (err) {
-      setMessage(err.response?.data?.error || 'Failed to create category');
+      setMessage(err.response?.data?.error || 'Failed to submit category');
     }
     setLoading(false);
   };
@@ -132,14 +148,24 @@ export default function CategoryManager() {
     setLoading(true);
     setMessage('');
     try {
-      const res = await API.post('/admin/subcategories', subcatForm);
-      if (res.data.success) {
-        setMessage('Success: Subcategory created successfully!');
-        setSubcatForm(prev => ({ ...prev, name: '', parentSubcategoryId: '', isClickable: true }));
-        await fetchSubcategories(selectedCategoryId);
+      if (editingSubcategoryId) {
+        const res = await API.put(`/admin/subcategories/${editingSubcategoryId}`, subcatForm);
+        if (res.data.success) {
+          setMessage('Success: Subcategory updated successfully!');
+          setSubcatForm(prev => ({ ...prev, name: '', parentSubcategoryId: '', isClickable: true }));
+          setEditingSubcategoryId(null);
+          await fetchSubcategories(selectedCategoryId);
+        }
+      } else {
+        const res = await API.post('/admin/subcategories', subcatForm);
+        if (res.data.success) {
+          setMessage('Success: Subcategory created successfully!');
+          setSubcatForm(prev => ({ ...prev, name: '', parentSubcategoryId: '', isClickable: true }));
+          await fetchSubcategories(selectedCategoryId);
+        }
       }
     } catch (err) {
-      setMessage(err.response?.data?.error || 'Failed to create subcategory');
+      setMessage(err.response?.data?.error || 'Failed to submit subcategory');
     }
     setLoading(false);
   };
@@ -156,6 +182,40 @@ export default function CategoryManager() {
     } catch (err) {
       setMessage(err.response?.data?.error || 'Failed to delete subcategory');
     }
+  };
+
+  const startEditCategory = (category) => {
+    setCategoryForm({
+      name: category.name,
+      icon: category.icon || 'briefcase',
+      isClickable: category.isClickable !== false
+    });
+    setEditingCategoryId(category._id);
+  };
+
+  const cancelEditCategory = () => {
+    setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true });
+    setEditingCategoryId(null);
+  };
+
+  const startEditSubcategory = (subcat) => {
+    setSubcatForm({
+      categoryId: subcat.categoryId?._id || subcat.categoryId,
+      parentSubcategoryId: subcat.parentSubcategoryId?._id || subcat.parentSubcategoryId || '',
+      name: subcat.name,
+      isClickable: subcat.isClickable !== false
+    });
+    setEditingSubcategoryId(subcat._id);
+  };
+
+  const cancelEditSubcategory = () => {
+    setSubcatForm({
+      categoryId: selectedCategoryId,
+      parentSubcategoryId: '',
+      name: '',
+      isClickable: true
+    });
+    setEditingSubcategoryId(null);
   };
 
   const subcategoryTree = buildSubcategoryTree(subcategories);
@@ -189,11 +249,20 @@ export default function CategoryManager() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Category Creation Form */}
+        {/* Category Creation / Editing Form */}
         <div className="lg:col-span-1 glass-effect p-6 rounded-2xl border border-white/5 shadow-xl h-fit">
           <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center space-x-1.5">
-            <Plus className="text-indigo-400" size={16} />
-            <span>Create Category</span>
+            {editingCategoryId ? (
+              <>
+                <Edit className="text-indigo-400" size={16} />
+                <span>Edit Category</span>
+              </>
+            ) : (
+              <>
+                <Plus className="text-indigo-400" size={16} />
+                <span>Create Category</span>
+              </>
+            )}
           </h3>
           <form onSubmit={handleCategorySubmit} className="space-y-4">
             <div>
@@ -236,13 +305,24 @@ export default function CategoryManager() {
               </label>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-premium hover:bg-gradient-premium-hover py-2.5 rounded-xl font-semibold text-white text-xs transition-all cursor-pointer"
-            >
-              {loading ? 'Creating...' : 'Create Category'}
-            </button>
+            <div className="flex space-x-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-gradient-premium hover:bg-gradient-premium-hover py-2.5 rounded-xl font-semibold text-white text-xs transition-all cursor-pointer text-center"
+              >
+                {loading ? 'Saving...' : editingCategoryId ? 'Save Changes' : 'Create Category'}
+              </button>
+              {editingCategoryId && (
+                <button
+                  type="button"
+                  onClick={cancelEditCategory}
+                  className="bg-white/5 hover:bg-white/10 border border-white/10 py-2.5 px-4 rounded-xl font-semibold text-gray-300 text-xs transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
@@ -274,8 +354,15 @@ export default function CategoryManager() {
                     <td className="p-3 font-mono text-gray-400">{c.icon}</td>
                     <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
                       <button
+                        onClick={() => startEditCategory(c)}
+                        className="p-1 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded transition-colors cursor-pointer mr-2 inline-flex items-center justify-center"
+                        title="Edit Category"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
                         onClick={() => handleCategoryDelete(c._id)}
-                        className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
+                        className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors cursor-pointer inline-flex items-center justify-center"
                         title="Delete Category"
                       >
                         <Trash2 size={14} />
@@ -304,10 +391,20 @@ export default function CategoryManager() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Create Subcategory Form */}
+          {/* Create/Edit Subcategory Form */}
           <div className="lg:col-span-1 glass-effect p-6 rounded-2xl border border-white/5 shadow-xl h-fit">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4">
-              Add Subcategory
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4 flex items-center space-x-1.5">
+              {editingSubcategoryId ? (
+                <>
+                  <Edit className="text-purple-400" size={14} />
+                  <span>Edit Subcategory</span>
+                </>
+              ) : (
+                <>
+                  <FolderPlus className="text-purple-400" size={14} />
+                  <span>Add Subcategory</span>
+                </>
+              )}
             </h4>
             <form onSubmit={handleSubcategorySubmit} className="space-y-4">
               <div>
@@ -317,7 +414,8 @@ export default function CategoryManager() {
                 <select
                   value={selectedCategoryId}
                   onChange={e => setSelectedCategoryId(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-white text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [&>option]:bg-[#0b0f19]"
+                  disabled={!!editingSubcategoryId}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-white text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [&>option]:bg-[#0b0f19] disabled:opacity-50"
                 >
                   <option value="">-- Select Category --</option>
                   {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
@@ -334,11 +432,13 @@ export default function CategoryManager() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-white text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [&>option]:bg-[#0b0f19]"
                 >
                   <option value="">-- None (Root Level) --</option>
-                  {orderedSubcategories.map(s => (
-                    <option key={s._id} value={s._id}>
-                      {'\u00A0'.repeat(s.depth * 4)}{s.depth > 0 ? '↳ ' : ''}{s.name}
-                    </option>
-                  ))}
+                  {orderedSubcategories
+                    .filter(s => !editingSubcategoryId || s._id !== editingSubcategoryId) // prevent parenting to self
+                    .map(s => (
+                      <option key={s._id} value={s._id}>
+                        {'\u00A0'.repeat(s.depth * 4)}{s.depth > 0 ? '↳ ' : ''}{s.name}
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -370,13 +470,24 @@ export default function CategoryManager() {
                 </label>
               </div>
 
-              <button
-                type="submit"
-                disabled={loading || !selectedCategoryId}
-                className="w-full bg-gradient-premium hover:bg-gradient-premium-hover py-2.5 rounded-xl font-semibold text-white text-xs transition-all disabled:opacity-40 cursor-pointer"
-              >
-                {loading ? 'Adding...' : 'Add Subcategory'}
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  type="submit"
+                  disabled={loading || !selectedCategoryId}
+                  className="flex-1 bg-gradient-premium hover:bg-gradient-premium-hover py-2.5 rounded-xl font-semibold text-white text-xs transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  {loading ? 'Saving...' : editingSubcategoryId ? 'Save Changes' : 'Add Subcategory'}
+                </button>
+                {editingSubcategoryId && (
+                  <button
+                    type="button"
+                    onClick={cancelEditSubcategory}
+                    className="bg-white/5 hover:bg-white/10 border border-white/10 py-2.5 px-4 rounded-xl font-semibold text-gray-300 text-xs transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
@@ -434,6 +545,13 @@ export default function CategoryManager() {
                             title="Add Sub-subcategory inside this"
                           >
                             <Plus size={14} />
+                          </button>
+                          <button
+                            onClick={() => startEditSubcategory(sub)}
+                            className="p-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded transition-colors cursor-pointer mr-2 inline-flex items-center justify-center"
+                            title="Edit Subcategory"
+                          >
+                            <Edit size={14} />
                           </button>
                           <button
                             onClick={() => handleSubcategoryDelete(sub._id)}

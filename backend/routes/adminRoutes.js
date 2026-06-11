@@ -5,7 +5,9 @@ const path = require('path');
 const fs = require('fs');
 const {
   createCategory,
+  updateCategory,
   createSubcategory,
+  updateSubcategory,
   uploadMaterial,
   getUsers,
   updateUser,
@@ -25,9 +27,11 @@ router.use(protect);
 router.use(authorize('SuperAdmin', 'SubAdmin'));
 
 router.post('/categories', createCategory);
+router.put('/categories/:id', updateCategory);
 router.delete('/categories/:id', deleteCategory);
 
 router.post('/subcategories', createSubcategory);
+router.put('/subcategories/:id', updateSubcategory);
 router.delete('/subcategories/:id', deleteSubcategory);
 
 router.get('/materials', getMaterials);

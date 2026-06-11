@@ -311,14 +311,23 @@ export default function Navbar({ onOpenProfileModal, categories = [] }) {
           <div className="px-3 py-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Our Services</p>
             {categories.map((cat) => (
-              <Link
-                key={cat._id}
-                to={`/category/${cat._id}`}
-                onClick={() => setIsOpen(false)}
-                className="block pl-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-md"
-              >
-                {cat.name}
-              </Link>
+              cat.isClickable !== false ? (
+                <Link
+                  key={cat._id}
+                  to={`/category/${cat._id}`}
+                  onClick={() => setIsOpen(false)}
+                  className="block pl-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-md"
+                >
+                  {cat.name}
+                </Link>
+              ) : (
+                <div
+                  key={cat._id}
+                  className="block pl-3 py-1.5 text-sm text-gray-500 cursor-default rounded-md"
+                >
+                  {cat.name}
+                </div>
+              )
             ))}
           </div>
 
