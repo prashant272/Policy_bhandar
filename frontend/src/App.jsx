@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import API from './services/api';
 
@@ -25,6 +25,19 @@ function AppContent() {
   const [categories, setCategories] = useState([]);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const isRegisterOrLoginOrAdminPath = 
+    location.pathname === '/register' || 
+    location.pathname === '/login' || 
+    location.pathname.startsWith('/admin');
+
+  // Redirect logged-in user without active plan to register/payment page
+  useEffect(() => {
+    if (!loading && user && !user.activePlan && user.role !== 'SuperAdmin' && user.role !== 'SubAdmin' && !isRegisterOrLoginOrAdminPath) {
+      navigate('/register');
+    }
+  }, [user, loading, location.pathname, navigate, isRegisterOrLoginOrAdminPath]);
 
   // Load categories globally for Navbar mega menu
   useEffect(() => {

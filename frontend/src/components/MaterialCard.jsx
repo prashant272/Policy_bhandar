@@ -13,6 +13,9 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
   const [previewUrl, setPreviewUrl] = useState(material.fileUrl);
   const [upgradePrompt, setUpgradePrompt] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStatus, setDownloadStatus] = useState('idle'); // 'idle', 'processing', 'completed'
 
   React.useEffect(() => {
     if (previewOpen && material.type === 'Banner' && user) {
@@ -39,19 +42,83 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
     }
   };
 
-  const handleDownload = async () => {
+  const handleDownload = async (selectedResolution = null) => {
+    if (downloading) return;
+    // Ensure selectedResolution is a string (and not a React SyntheticEvent object)
+    const resolution = typeof selectedResolution === 'string' ? selectedResolution : null;
+
     if (!user) {
       onOpenAuthModal();
       return;
     }
 
+    if ((material.type === 'Reel' || material.type === 'Video') && !resolution) {
+      setResolutionModalOpen(true);
+      return;
+    }
+
     setDownloading(true);
+    setResolutionModalOpen(false);
+    setDownloadStatus('processing');
+    setDownloadProgress(0);
 
     try {
       // 1. Call API to check/increment download count
-      const response = await API.post(`/materials/${material._id}/download`);
+      console.log('Sending download request with resolution:', resolution);
+      const response = await API.post(`/materials/${material._id}/download`, { resolution });
       
       if (response.data.success) {
+        // Handle background job tracking if jobId returned
+        if (response.data.data.jobId) {
+          const jobId = response.data.data.jobId;
+          let downloadTriggered = false;
+          
+          const pollInterval = setInterval(async () => {
+            try {
+              const jobResponse = await API.get(`/materials/download-job/${jobId}`);
+              if (jobResponse.data.success) {
+                const job = jobResponse.data.data;
+                console.log('Polled job status:', job);
+                setDownloadProgress(job.progress || 0);
+
+                if (job.status === 'completed' && !downloadTriggered) {
+                  downloadTriggered = true;
+                  clearInterval(pollInterval);
+                  setDownloadStatus('completed');
+                  
+                  // Trigger final download
+                  const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
+                  const directUrl = `${apiBase}/materials/download-direct?file=${encodeURIComponent(job.fileUrl)}&name=${encodeURIComponent(material.title + '-' + material.type + '.mp4')}`;
+                  await triggerDownload(directUrl, `${material.title}-${material.type}.mp4`);
+
+                  // Reset download state after a slight delay
+                  setTimeout(() => {
+                    setDownloading(false);
+                    setDownloadStatus('idle');
+                    setDownloadProgress(0);
+                  }, 1500);
+                } else if (job.status === 'failed') {
+                  clearInterval(pollInterval);
+                  setDownloading(false);
+                  setDownloadStatus('idle');
+                  alert(job.error || 'Video processing failed');
+                }
+              }
+            } catch (err) {
+              clearInterval(pollInterval);
+              setDownloading(false);
+              setDownloadStatus('idle');
+              console.error('Job polling failed:', err);
+              alert('Failed to get video progress');
+            }
+          }, 600);
+
+          if (onDownloadSuccess) {
+            onDownloadSuccess(response.data.data.downloadCount);
+          }
+          return;
+        }
+
         const fileUrl = response.data.data.fileUrl;
         
         // 2. Perform Watermarking for Banners (Images)
@@ -59,10 +126,10 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
           try {
             // Apply canvas overlay with template
             const watermarkedDataUrl = await watermarkImage(material.fileUrl, user, material.watermarkTemplateId);
-            triggerDownload(watermarkedDataUrl, `${material.title}-watermarked.jpg`);
+            await triggerDownload(watermarkedDataUrl, `${material.title}-watermarked.jpg`);
           } catch (err) {
             console.error('Watermarking failed, downloading raw file', err);
-            triggerDownload(material.fileUrl, `${material.title}.jpg`);
+            await triggerDownload(material.fileUrl, `${material.title}.jpg`);
           }
         } else if (material.type === 'PDF' || material.type === 'Brochure') {
           try {
@@ -70,22 +137,26 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
               ? `${window.location.protocol}//${window.location.hostname}:5000${fileUrl}` 
               : fileUrl;
             const watermarkedPdfUrl = await watermarkPDF(downloadUrl, user);
-            triggerDownload(watermarkedPdfUrl, `${material.title}-watermarked.pdf`);
+            await triggerDownload(watermarkedPdfUrl, `${material.title}-watermarked.pdf`);
           } catch (err) {
             console.error('PDF Watermarking failed, downloading raw file', err);
-            triggerDownload(fileUrl, `${material.title}.pdf`);
+            const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
+            const directUrl = `${apiBase}/materials/download-direct?file=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(material.title + '.pdf')}`;
+            await triggerDownload(directUrl, `${material.title}.pdf`);
           }
         } else {
-          // Prepend API host if it is a local upload path
-          const downloadUrl = fileUrl.startsWith('/uploads') 
-            ? `${window.location.protocol}//${window.location.hostname}:5000${fileUrl}` 
-            : fileUrl;
-          triggerDownload(downloadUrl, `${material.title}-${material.type}.mp4`);
+          const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
+          const directUrl = `${apiBase}/materials/download-direct?file=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(material.title + '-' + material.type + '.mp4')}`;
+          await triggerDownload(directUrl, `${material.title}-${material.type}.mp4`);
         }
 
         if (onDownloadSuccess) {
           onDownloadSuccess(response.data.data.downloadCount);
         }
+
+        // Reset state for non-job path downloads
+        setDownloading(false);
+        setDownloadStatus('idle');
       }
     } catch (error) {
       console.error('Download error:', error);
@@ -95,18 +166,27 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
       } else {
          alert(error.response?.data?.error || 'Download failed');
       }
-    } finally {
       setDownloading(false);
+      setDownloadStatus('idle');
     }
   };
 
-  const triggerDownload = (url, filename) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const triggerDownload = async (url, filename) => {
+    if (!url || url.includes('file=undefined')) {
+      console.error('Download aborted: File path is undefined', url);
+      alert('Failed to download: The file could not be generated. Please try again.');
+      return;
+    }
+
+    // Use a hidden iframe for downloads to prevent cross-origin page redirection
+    let iframe = document.getElementById('download-iframe');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'download-iframe';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+    iframe.src = url;
   };
 
   const renderHTMLOverlay = (isMini = false) => {
@@ -179,7 +259,7 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
             >
               {tpl.logoUrl ? (
                 <img 
-                  src={tpl.logoUrl.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${tpl.logoUrl}` : tpl.logoUrl} 
+                  src={tpl.logoUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${tpl.logoUrl}` : tpl.logoUrl} 
                   className="w-full h-full object-contain p-0.5" 
                   alt="Logo" 
                 />
@@ -282,9 +362,9 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
             </div>
           ))}
           
-          <div className="flex-1 min-w-0">
-            {tpl.showUserName && <h4 className={isMini ? "font-bold text-[8px] truncate leading-tight" : "font-bold text-sm sm:text-base truncate"} style={{ color: tpl.textColor, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{user.name}</h4>}
-            {tpl.showUserDetails && <p className={isMini ? "text-[6px] truncate leading-tight opacity-90" : "text-[10px] sm:text-xs truncate opacity-90"} style={{ color: tpl.textColor, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{user.agentType || 'Advisor'} | {user.company || 'Policybhandar'}</p>}
+          <div className="flex-1">
+            {tpl.showUserName && <h4 className={isMini ? "font-bold text-[8px] leading-tight" : "font-bold text-sm sm:text-base"} style={{ color: tpl.textColor, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{user.name}</h4>}
+            {tpl.showUserDetails && <p className={isMini ? "text-[6px] opacity-90" : "text-[10px] sm:text-xs opacity-90"} style={{ color: tpl.textColor, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{user.agentType || 'Advisor'} | {user.company || 'Policybhandar'}</p>}
             
             {tpl.showSocialIcons && !isMini && (
               <div className="flex items-center gap-1.5 mt-1">
@@ -380,16 +460,32 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
           <button
             onClick={handleDownload}
             disabled={downloading}
-            className="w-full bg-gradient-premium hover:bg-gradient-premium-hover rounded-xl py-2.5 text-xs font-semibold text-white flex items-center justify-center space-x-1.5 shadow-lg shadow-indigo-500/10 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+            className="w-full bg-gradient-premium hover:bg-gradient-premium-hover rounded-xl py-2.5 text-xs font-semibold text-white flex items-center justify-center space-x-1.5 shadow-lg shadow-indigo-500/10 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 relative overflow-hidden"
           >
-            {downloading ? (
-              <span className="w-4 h-4 border border-white/35 border-t-white rounded-full animate-spin"></span>
-            ) : (
-              <>
-                <Download size={16} />
-                <span>Get Watermarked File</span>
-              </>
+            {downloading && downloadStatus === 'processing' && (
+              <div 
+                className="absolute inset-y-0 left-0 bg-indigo-600/40 transition-all duration-300 pointer-events-none" 
+                style={{ width: `${downloadProgress}%` }}
+              ></div>
             )}
+            
+            <span className="relative z-10 flex items-center gap-1.5">
+              {downloading ? (
+                downloadStatus === 'processing' ? (
+                  <span>Processing: {downloadProgress}%</span>
+                ) : (
+                  <>
+                    <span className="w-4 h-4 border border-white/35 border-t-white rounded-full animate-spin"></span>
+                    <span>Downloading...</span>
+                  </>
+                )
+              ) : (
+                <>
+                  <Download size={16} />
+                  <span>Get Watermarked File</span>
+                </>
+              )}
+            </span>
           </button>
         </div>
       </div>
@@ -406,10 +502,28 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
                 <button
                   onClick={handleDownload}
                   disabled={downloading}
-                  className="bg-gradient-premium hover:bg-gradient-premium-hover text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center gap-2"
+                  className="bg-gradient-premium hover:bg-gradient-premium-hover text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center gap-2 relative overflow-hidden"
                 >
-                  {downloading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : <Download size={16} />}
-                  Download
+                  {downloading && downloadStatus === 'processing' && (
+                    <div 
+                      className="absolute inset-y-0 left-0 bg-indigo-600/40 transition-all duration-300 pointer-events-none" 
+                      style={{ width: `${downloadProgress}%` }}
+                    ></div>
+                  )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    {downloading ? (
+                      downloadStatus === 'processing' ? (
+                        <span>Processing: {downloadProgress}%</span>
+                      ) : (
+                        <span>Downloading...</span>
+                      )
+                    ) : (
+                      <>
+                        <Download size={16} />
+                        <span>Download</span>
+                      </>
+                    )}
+                  </span>
                 </button>
                 <button
                   onClick={() => setPreviewOpen(false)}
@@ -474,6 +588,64 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
               </a>
               <button onClick={() => setUpgradePrompt(false)} className="w-full py-3 text-gray-400 hover:text-white font-semibold cursor-pointer">
                 Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Resolution Selection Modal */}
+      {resolutionModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl shadow-indigo-500/10 relative overflow-hidden">
+            {/* Background glowing gradient */}
+            <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-pink-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Video className="text-indigo-400" size={20} />
+                <span>Select Quality / Resolution</span>
+              </h3>
+              <button 
+                onClick={() => setResolutionModalOpen(false)}
+                className="text-gray-400 hover:text-white p-1.5 bg-white/5 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-gray-400 text-sm mb-6">
+              Choose the video quality you'd like to download. Higher resolution looks better but takes longer to process and download.
+            </p>
+
+            <div className="space-y-3">
+              {[
+                { value: '1080', label: '1080p (Full HD)', desc: 'Best quality for social media and presentations' },
+                { value: '720', label: '720p (HD)', desc: 'Standard high-definition, good balance' },
+                { value: '480', label: '480p (Standard)', desc: 'Compressed quality, fast download, small size' }
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleDownload(opt.value)}
+                  className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 hover:border-indigo-500/40 rounded-2xl p-4 transition-all duration-200 cursor-pointer group active:scale-[0.99] flex flex-col justify-start"
+                >
+                  <div className="font-semibold text-white group-hover:text-indigo-400 transition-colors flex items-center justify-between">
+                    <span>{opt.label}</span>
+                    <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-bold">MP4</span>
+                  </div>
+                  <span className="text-xs text-gray-500 mt-1 leading-normal">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setResolutionModalOpen(false)}
+                className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-xl text-sm font-semibold transition-all cursor-pointer"
+              >
+                Cancel
               </button>
             </div>
           </div>

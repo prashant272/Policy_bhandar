@@ -2,12 +2,12 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import API from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { User, Mail, Lock, Phone, ArrowRight, ShieldCheck, CheckCircle2, Activity, MapPin, Building, Briefcase } from 'lucide-react';
+import { User, Mail, Lock, Phone, ArrowRight, ShieldCheck, CheckCircle2, Activity, MapPin, Building, Briefcase, Zap, Check, DownloadCloud } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { fetchUser } = useContext(AuthContext);
+  const { user, fetchUser } = useContext(AuthContext);
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -38,6 +38,106 @@ export default function RegisterPage() {
     designation: '',
     profilePhoto: null
   });
+
+  // Step 4: Subscriptions
+  const [plans, setPlans] = useState([]);
+  const [processingPlanId, setProcessingPlanId] = useState(null);
+
+  // Fetch plans and load Razorpay script when Step 4 is reached
+  useEffect(() => {
+    if (step === 4) {
+      API.get('/plans')
+        .then(res => {
+          if (res.data.success) {
+            setPlans(res.data.data.filter(p => p.isActive));
+          }
+        })
+        .catch(err => console.error(err));
+
+      if (!window.Razorpay) {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+    }
+  }, [step]);
+
+  // Set step to 4 if logged-in user doesn't have activePlan (e.g. on page refresh or direct access)
+  useEffect(() => {
+    if (user && !user.activePlan && user.role !== 'SuperAdmin' && user.role !== 'SubAdmin') {
+      setStep(4);
+    }
+  }, [user]);
+
+  const handleSubscription = async (plan) => {
+    setProcessingPlanId(plan._id);
+    setError('');
+    try {
+      const res = await API.post('/payments/create-subscription', { planId: plan._id });
+      if (!res.data.success) throw new Error(res.data.error || 'Failed to initialize subscription');
+      
+      const { data: subData, key } = res.data;
+      const currentUserRes = await API.get('/auth/me');
+      const currentUser = currentUserRes.data.data;
+
+      const options = {
+        key: key,
+        subscription_id: subData.id,
+        name: 'Policybhandar',
+        description: `${plan.name} - 15 Days Free Trial`,
+        handler: async function (response) {
+          try {
+            setLoading(true);
+            const verifyRes = await API.post('/payments/verify-subscription', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
+              razorpay_signature: response.razorpay_signature,
+              planId: plan._id
+            });
+
+            if (verifyRes.data.success) {
+              await fetchUser();
+              window.alert('Autopay & subscription activated! 15 days free trial started.');
+              navigate('/');
+            }
+          } catch (err) {
+            console.error('Subscription verification error:', err);
+            setError('Payment verification failed.');
+          } finally {
+            setLoading(false);
+          }
+        },
+        prefill: {
+          name: currentUser?.name || formData.name,
+          email: currentUser?.email || formData.email,
+          contact: currentUser?.mobile || formData.mobile
+        },
+        theme: {
+          color: '#f97316'
+        }
+      };
+
+      if (!window.Razorpay) {
+        setError('Razorpay payment gateway failed to load. Please try again.');
+        setProcessingPlanId(null);
+        return;
+      }
+
+      const rzp1 = new window.Razorpay(options);
+      rzp1.on('payment.failed', function (response) {
+        console.error(response.error);
+        setError('Subscription initiation failed: ' + response.error.description);
+      });
+      rzp1.open();
+
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.error || err.message || 'Could not initiate subscription.');
+    } finally {
+      setProcessingPlanId(null);
+    }
+  };
 
   // Load Categories on mount
   useEffect(() => {
@@ -129,8 +229,8 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       if (res.data.success) {
-        login(res.data.user);
-        navigate('/');
+        await fetchUser(); // Updates AuthContext
+        setStep(4); // Proceed to Payment/Subscription Step
       }
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -161,12 +261,13 @@ export default function RegisterPage() {
 
           <div className="relative z-10 my-10">
             <h2 className="text-4xl lg:text-5xl font-black leading-[1.1] mb-6 tracking-tight">
-              {step === 1 ? 'Start your journey with us.' : step === 2 ? 'Verify your identity.' : 'Personalize your feed.'}
+              {step === 1 ? 'Start your journey with us.' : step === 2 ? 'Verify your identity.' : step === 3 ? 'Personalize your feed.' : 'Choose your plan.'}
             </h2>
             <p className="text-slate-300 text-lg max-w-sm font-medium leading-relaxed">
               {step === 1 ? 'Join thousands of agents using Policybhandar to grow their insurance business 10x.' : 
                step === 2 ? 'We sent a verification code to your email and WhatsApp.' : 
-               'Tell us what products you sell so we can customize your marketing materials.'}
+               step === 3 ? 'Tell us what products you sell so we can customize your marketing materials.' :
+               'Start your 15 days free trial now. Autopay starts only after the trial ends.'}
             </p>
 
             <div className="mt-12 space-y-6">
@@ -181,6 +282,10 @@ export default function RegisterPage() {
               <div className={`flex items-center gap-5 transition-all duration-300 ${step >= 3 ? 'opacity-100 translate-x-0' : 'opacity-40 -translate-x-2'}`}>
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg shadow-lg ${step >= 3 ? 'bg-orange-500 text-white shadow-orange-500/30' : 'bg-white/10 border border-white/20 text-white/50'}`}>3</div>
                 <span className={`font-bold text-lg ${step >= 3 ? 'text-white' : 'text-slate-400'}`}>Profile Setup</span>
+              </div>
+              <div className={`flex items-center gap-5 transition-all duration-300 ${step >= 4 ? 'opacity-100 translate-x-0' : 'opacity-40 -translate-x-2'}`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg shadow-lg ${step >= 4 ? 'bg-orange-500 text-white shadow-orange-500/30' : 'bg-white/10 border border-white/20 text-white/50'}`}>4</div>
+                <span className={`font-bold text-lg ${step >= 4 ? 'text-white' : 'text-slate-400'}`}>Activate Plan</span>
               </div>
             </div>
           </div>
@@ -431,7 +536,7 @@ export default function RegisterPage() {
                     
                     <button
                       type="button"
-                      onClick={() => navigate('/')}
+                      onClick={() => setStep(4)}
                       disabled={loading}
                       className="w-full py-3 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors"
                     >
@@ -439,6 +544,82 @@ export default function RegisterPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            )}
+
+            {/* STEP 4: Choose Plan & Autopay */}
+            {step === 4 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 w-full max-w-lg">
+                <div className="text-center md:text-left">
+                  <div className="w-16 h-16 bg-orange-50 border border-orange-100 rounded-2xl flex items-center justify-center mb-6 mx-auto md:mx-0 shadow-sm">
+                    <Zap className="w-8 h-8 text-orange-600 animate-pulse" />
+                  </div>
+                  <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">Select Subscription Plan</h2>
+                  <p className="mt-3 text-slate-500 font-medium text-base">
+                    Get started with a <strong>15-day free trial</strong>. No charges will be made today. Autopay starts after the trial period.
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-sm border border-red-100 font-medium shadow-sm flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center shrink-0">!</div>
+                    {error}
+                  </div>
+                )}
+
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+                  {plans.map((plan) => (
+                    <div
+                      key={plan._id}
+                      className="border-2 border-slate-100 hover:border-orange-500/50 rounded-2xl p-5 transition-all bg-slate-50 flex flex-col justify-between"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
+                          <p className="text-xs text-slate-500">Validity: {plan.validityDays} Days</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xl font-extrabold text-orange-600">₹{plan.price}</span>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">After 15 days free</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2 text-xs text-slate-600 mb-4">
+                        <div className="flex items-center gap-2 font-medium">
+                          <DownloadCloud size={14} className="text-orange-500" />
+                          <span>{plan.dailyDownloadLimit === -1 ? 'Unlimited Daily Downloads' : `${plan.dailyDownloadLimit} Downloads/day`}</span>
+                        </div>
+                        {plan.features.slice(0, 3).map((feat, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-emerald-500 font-bold">✓</span>
+                            <span>{feat}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSubscription(plan)}
+                        disabled={processingPlanId === plan._id || loading}
+                        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {processingPlanId === plan._id ? (
+                          <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        ) : (
+                          <>
+                            <Zap size={14} />
+                            <span>Start 15 Days Free Trial</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                  {plans.length === 0 && (
+                    <div className="text-center py-8 text-slate-400 font-medium">
+                      Loading pricing plans...
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

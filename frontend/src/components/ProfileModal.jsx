@@ -4,8 +4,8 @@ import API from '../services/api';
 import { X, Upload, CheckCircle2, User, Phone, Mail, Building, Briefcase, Link as LinkIcon } from 'lucide-react';
 
 export default function ProfileModal({ isOpen, onClose }) {
-  const { user, fetchUser } = useContext(AuthContext); 
-  
+  const { user, fetchUser } = useContext(AuthContext);
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     mobile: user?.mobile || '',
@@ -19,12 +19,12 @@ export default function ProfileModal({ isOpen, onClose }) {
     selectedSubcategoryId: user?.selectedSubcategoryId || '',
     profilePhotoUrl: ''
   });
-  
+
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(user?.profilePhoto ? (user.profilePhoto.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${user.profilePhoto}` : user.profilePhoto) : null);
-  
+
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -138,7 +138,7 @@ export default function ProfileModal({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative flex flex-col max-h-[90vh]">
-        
+
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
           <h2 className="text-lg font-bold text-slate-800">My Profile</h2>
@@ -161,7 +161,7 @@ export default function ProfileModal({ isOpen, onClose }) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            
+
             {/* Photo Upload */}
             <div className="flex flex-col items-center justify-center mb-6">
               <div className="relative group cursor-pointer">
@@ -179,16 +179,16 @@ export default function ProfileModal({ isOpen, onClose }) {
                 </label>
               </div>
               <p className="text-xs text-slate-500 mt-2 font-medium mb-3">Upload photo OR paste link below</p>
-              
+
               <div className="w-full relative max-w-xs">
                 <LinkIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                  type="text" 
-                  name="profilePhotoUrl" 
-                  value={formData.profilePhotoUrl} 
-                  onChange={handleChange} 
-                  placeholder="Paste Image URL here..." 
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-orange-500 transition-all" 
+                <input
+                  type="text"
+                  name="profilePhotoUrl"
+                  value={formData.profilePhotoUrl}
+                  onChange={handleChange}
+                  placeholder="Paste Image URL here..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-orange-500 transition-all"
                 />
               </div>
             </div>
