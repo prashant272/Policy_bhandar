@@ -271,7 +271,7 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
     } else {
       const initial = name ? name.charAt(0).toUpperCase() : 'P';
       photoElement += `
-        <text x="${boxX + boxSize / 2}" y="${boxY + boxSize / 2}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${Math.round(boxSize * 0.35)}" font-weight="bold" fill="${config.textColor || '#000000'}" text-anchor="middle" dominant-baseline="central">${initial}</text>
+        <text x="${boxX + boxSize / 2}" y="${boxY + boxSize / 2}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(boxSize * 0.35)}" font-weight="bold" fill="${config.textColor || '#000000'}" text-anchor="middle" dominant-baseline="central">${initial}</text>
       `;
     }
     currentX += boxSize + Math.round(cardWidth * 0.03);
@@ -304,7 +304,7 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
         const initial = name ? name.charAt(0).toUpperCase() : 'P';
         photoElement = `
           <circle cx="${photoX}" cy="${photoY}" r="${photoRadius}" fill="#1e293b" stroke="${config.accentColor || '#f97316'}" stroke-width="2" />
-          <text x="${photoX}" y="${photoY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${Math.round(photoRadius * 1.1)}" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>
+          <text x="${photoX}" y="${photoY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(photoRadius * 1.1)}" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>
         `;
       }
       currentX += photoDiameter + Math.round(cardWidth * 0.025);
@@ -327,57 +327,57 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
     let startY = boxY;
     const boxLineHeight = Math.round(cardHeight * 0.11);
     
-    textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${Math.round(cardHeight * 0.09)}" font-weight="500" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">With Best Regards,</text>`;
+    textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.09)}" font-weight="500" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">With Best Regards,</text>`;
     startY += boxLineHeight * 1.1;
 
     if (config.showUserName) {
-      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${Math.round(cardHeight * 0.15)}" font-weight="bold" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">${name.toUpperCase()}</text>`;
+      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.15)}" font-weight="bold" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">${name.toUpperCase()}</text>`;
       startY += boxLineHeight * 1.3;
     }
     if (config.showUserDetails) {
-      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${Math.round(cardHeight * 0.095)}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.9" filter="url(#shadow)" dominant-baseline="middle">${agentType}</text>`;
+      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.095)}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.9" filter="url(#shadow)" dominant-baseline="middle">${agentType}</text>`;
       startY += boxLineHeight;
     }
     if (config.showUserMobile) {
-      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${Math.round(cardHeight * 0.095)}" font-weight="bold" fill="${config.accentColor || '#f97316'}" filter="url(#shadow)" dominant-baseline="middle">Mob: +91 ${mobile}</text>`;
+      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.095)}" font-weight="bold" fill="${config.accentColor || '#f97316'}" filter="url(#shadow)" dominant-baseline="middle">Mob: +91 ${mobile}</text>`;
       startY += boxLineHeight;
     }
-    textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${Math.round(cardHeight * 0.095)}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.8" filter="url(#shadow)" dominant-baseline="middle">${email}</text>`;
+    textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.095)}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.8" filter="url(#shadow)" dominant-baseline="middle">${email}</text>`;
     startY += boxLineHeight;
 
     if (config.showUserDetails) {
-      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${Math.round(cardHeight * 0.095)}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.8" filter="url(#shadow)" dominant-baseline="middle">${company}</text>`;
+      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.095)}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.8" filter="url(#shadow)" dominant-baseline="middle">${company}</text>`;
     }
   } else if (isBox) {
     const boxLineHeight = Math.round(cardHeight * 0.18);
     let startY = centerY - Math.round(cardHeight * 0.25);
     
     if (config.showUserName) {
-      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${nameFontSize}" font-weight="bold" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">${name}</text>`;
+      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${nameFontSize}" font-weight="bold" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">${name}</text>`;
       startY += boxLineHeight * 1.2;
     }
     if (config.showUserDetails) {
-      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${detailFontSize}" font-weight="600" fill="${config.textColor || '#ffffff'}" opacity="0.9" filter="url(#shadow)" dominant-baseline="middle">${agentType} | ${company}</text>`;
+      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${detailFontSize}" font-weight="600" fill="${config.textColor || '#ffffff'}" opacity="0.9" filter="url(#shadow)" dominant-baseline="middle">${agentType} | ${company}</text>`;
       startY += boxLineHeight;
     }
     if (config.showUserMobile) {
-      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${detailFontSize}" font-weight="bold" fill="${config.accentColor || '#f97316'}" filter="url(#shadow)" dominant-baseline="middle">Mob: +91 ${mobile}</text>`;
+      textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${detailFontSize}" font-weight="bold" fill="${config.accentColor || '#f97316'}" filter="url(#shadow)" dominant-baseline="middle">Mob: +91 ${mobile}</text>`;
       startY += boxLineHeight;
     }
-    textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${detailFontSize}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.8" filter="url(#shadow)" dominant-baseline="middle">${email}</text>`;
+    textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${detailFontSize}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.8" filter="url(#shadow)" dominant-baseline="middle">${email}</text>`;
   } else {
     // Bar layouts
     if (config.showUserName) {
-      textElements += `<text x="${currentX}" y="${nameY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${nameFontSize}" font-weight="bold" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">${name}</text>`;
+      textElements += `<text x="${currentX}" y="${nameY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${nameFontSize}" font-weight="bold" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">${name}</text>`;
     }
     if (config.showUserDetails) {
-      textElements += `<text x="${currentX}" y="${detailsY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${detailFontSize}" font-weight="600" fill="${config.textColor || '#ffffff'}" opacity="0.9" filter="url(#shadow)" dominant-baseline="middle">${agentType} | ${company}</text>`;
+      textElements += `<text x="${currentX}" y="${detailsY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${detailFontSize}" font-weight="600" fill="${config.textColor || '#ffffff'}" opacity="0.9" filter="url(#shadow)" dominant-baseline="middle">${agentType} | ${company}</text>`;
     }
 
     if (config.showUserMobile) {
       contactElements += `
-        <text x="${cardX + cardWidth - paddingX}" y="${nameY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${nameFontSize}" font-weight="bold" fill="${config.accentColor || '#f97316'}" filter="url(#shadow)" text-anchor="end" dominant-baseline="middle">Mob: +91 ${mobile}</text>
-        <text x="${cardX + cardWidth - paddingX}" y="${detailsY}" font-family="'Plus Jakarta Sans', sans-serif" font-size="${detailFontSize}" font-weight="600" fill="${config.textColor || '#ffffff'}" opacity="0.9" filter="url(#shadow)" text-anchor="end" dominant-baseline="middle">${email}</text>
+        <text x="${cardX + cardWidth - paddingX}" y="${nameY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${nameFontSize}" font-weight="bold" fill="${config.accentColor || '#f97316'}" filter="url(#shadow)" text-anchor="end" dominant-baseline="middle">Mob: +91 ${mobile}</text>
+        <text x="${cardX + cardWidth - paddingX}" y="${detailsY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${detailFontSize}" font-weight="600" fill="${config.textColor || '#ffffff'}" opacity="0.9" filter="url(#shadow)" text-anchor="end" dominant-baseline="middle">${email}</text>
       `;
     }
   }
