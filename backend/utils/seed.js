@@ -26,7 +26,7 @@ const seedData = async () => {
       name: 'Prashant Kumar Jha',
       mobile: '9999999999',
       email: 'admin@policybhandar.com',
-      password: 'adminpassword', // Will be hashed by user schema pre-save hook
+      password: '123456789', // Will be hashed by user schema pre-save hook
       role: 'SuperAdmin',
       isVerified: true,
       state: 'Bihar',

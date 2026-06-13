@@ -82,7 +82,6 @@ const UserSchema = new mongoose.Schema({
   },
   subscriptionType: {
     type: String,
-    enum: ['Free', 'Monthly', 'Quarterly', 'Yearly'],
     default: 'Free'
   },
   activePlan: {
@@ -91,6 +90,12 @@ const UserSchema = new mongoose.Schema({
   },
   planExpiryDate: {
     type: Date
+  },
+  razorpaySubscriptionId: {
+    type: String
+  },
+  subscriptionStatus: {
+    type: String
   },
   downloadCount: {
     type: Number,

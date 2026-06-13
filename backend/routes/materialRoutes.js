@@ -5,13 +5,17 @@ const {
   getSubcategories,
   getMaterials,
   getTags,
-  downloadMaterial
+  downloadMaterial,
+  downloadDirect,
+  getDownloadJobStatus
 } = require('../controllers/materialController');
 const { protect } = require('../middlewares/auth');
 
 router.get('/categories', getCategories);
 router.get('/categories/:categoryId/subcategories', getSubcategories);
 router.get('/tags', getTags);
+router.get('/download-job/:jobId', getDownloadJobStatus);
+router.get('/download-direct', downloadDirect);
 router.get('/', getMaterials);
 router.post('/:id/download', protect, downloadMaterial);
 

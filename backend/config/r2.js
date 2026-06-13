@@ -54,6 +54,62 @@ const uploadFile = async (file) => {
     }
   }
 
+  // If file is a video or reel, compress it using ffmpeg
+  if (file.mimetype.startsWith('video/')) {
+    const ffmpegPath = require('ffmpeg-static');
+    const { execFile } = require('child_process');
+    const uploadDir = path.join(__dirname, '../../uploads');
+    
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const tempOriginalPath = path.join(uploadDir, `temp-orig-${uniqueSuffix}${finalExtension}`);
+    const tempCompressedPath = path.join(uploadDir, `temp-comp-${uniqueSuffix}${finalExtension}`);
+
+    try {
+      // Save buffer to temporary original file
+      fs.writeFileSync(tempOriginalPath, file.buffer);
+
+      // Compress video
+      await new Promise((resolve, reject) => {
+        const args = [
+          '-y',
+          '-i', tempOriginalPath,
+          '-c:v', 'libx264',
+          '-preset', 'fast',
+          '-crf', '34',
+          '-c:a', 'aac',
+          '-b:a', '128k',
+          tempCompressedPath
+        ];
+        execFile(ffmpegPath, args, (err, stdout, stderr) => {
+          if (err) {
+            console.error('ffmpeg upload compression failed:', stderr);
+            return reject(err);
+          }
+          resolve();
+        });
+      });
+
+      // Read compressed buffer
+      if (fs.existsSync(tempCompressedPath)) {
+        finalBuffer = fs.readFileSync(tempCompressedPath);
+        console.log(`Video compressed: size reduced from ${file.buffer.length} to ${finalBuffer.length} bytes.`);
+      }
+    } catch (err) {
+      console.error('Video compression error, using original video:', err);
+    } finally {
+      // Clean up temp files
+      try {
+        if (fs.existsSync(tempOriginalPath)) fs.unlinkSync(tempOriginalPath);
+        if (fs.existsSync(tempCompressedPath)) fs.unlinkSync(tempCompressedPath);
+      } catch (cleanupErr) {
+        console.error('Failed to cleanup temp upload files:', cleanupErr);
+      }
+    }
+  }
+
   const fileKey = `${file.fieldname}-${uniqueSuffix}${finalExtension}`;
 
   if (isR2Configured && s2Client) {

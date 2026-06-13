@@ -38,6 +38,9 @@ const planSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  razorpayPlanId: {
+    type: String
   }
 }, {
   timestamps: true

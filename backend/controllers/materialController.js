@@ -2,9 +2,13 @@ const Material = require('../models/Material');
 const Category = require('../models/Category');
 const Subcategory = require('../models/Subcategory');
 const User = require('../models/User');
+const WatermarkTemplate = require('../models/WatermarkTemplate');
 const { watermarkVideo } = require('../utils/videoWatermark');
 const path = require('path');
 const fs = require('fs');
+
+// In-memory store for active download jobs
+const downloadJobs = {};
 
 // @desc    Get all categories
 // @route   GET /api/materials/categories
@@ -96,13 +100,24 @@ exports.getMaterials = async (req, res) => {
       .limit(Number(limit))
       .sort({ createdAt: -1 });
 
+    // Fetch the latest watermark template to use as the default if none is set
+    const defaultTemplate = await WatermarkTemplate.findOne().sort({ createdAt: -1 });
+
+    const processedMaterials = materials.map(m => {
+      const obj = m.toObject();
+      if (!obj.watermarkTemplateId && defaultTemplate) {
+        obj.watermarkTemplateId = defaultTemplate.toObject();
+      }
+      return obj;
+    });
+
     res.status(200).json({
       success: true,
       count: materials.length,
       total,
       pages: Math.ceil(total / limit),
       currentPage: Number(page),
-      data: materials
+      data: processedMaterials
     });
   } catch (err) {
     res.status(500).json({
@@ -156,7 +171,7 @@ exports.getTags = async (req, res) => {
 // @access  Private (Agent/Leader/SubAdmin/SuperAdmin)
 exports.downloadMaterial = async (req, res) => {
   try {
-    const material = await Material.findById(req.params.id);
+    const material = await Material.findById(req.params.id).populate('watermarkTemplateId');
     if (!material) {
       return res.status(404).json({
         success: false,
@@ -224,23 +239,62 @@ exports.downloadMaterial = async (req, res) => {
       }
     }
 
+    console.log('Download req.body:', req.body);
+    const { resolution } = req.body || {};
     let finalFileUrl = material.fileUrl;
 
     if (material.type === 'Reel' || material.type === 'Video') {
-      try {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        const outputFilename = `watermarked-${uniqueSuffix}.mp4`;
-        const outputPath = path.join(__dirname, '../../uploads', outputFilename);
-        
-        const downloadUrl = material.fileUrl.startsWith('/uploads')
-          ? `${req.protocol}://${req.get('host')}${material.fileUrl}`
-          : material.fileUrl;
-        
-        await watermarkVideo(downloadUrl, user, outputPath);
-        finalFileUrl = `/uploads/${outputFilename}`;
-      } catch (err) {
-        console.error('Video watermarking failed, serving raw file:', err);
-      }
+      const jobId = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      downloadJobs[jobId] = {
+        status: 'processing',
+        progress: 0,
+        fileUrl: null,
+        error: null
+      };
+
+      // Start processing in background
+      (async () => {
+        try {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const outputFilename = `watermarked-${uniqueSuffix}.mp4`;
+          const outputPath = path.join(__dirname, '../uploads', outputFilename);
+          
+          const downloadUrl = material.fileUrl.startsWith('/uploads')
+            ? `${req.protocol}://${req.get('host')}${material.fileUrl}`
+            : material.fileUrl;
+          
+          let template = material.watermarkTemplateId;
+          if (!template) {
+            template = await WatermarkTemplate.findOne().sort({ createdAt: -1 });
+          }
+
+          console.log(`Starting background watermarking for job ${jobId}, resolution: ${resolution}`);
+          await watermarkVideo(downloadUrl, user, outputPath, resolution, template, (percent) => {
+            downloadJobs[jobId].progress = percent;
+            console.log(`Job ${jobId} progress: ${percent}%`);
+          });
+
+          downloadJobs[jobId].fileUrl = `/uploads/${outputFilename}`;
+          downloadJobs[jobId].status = 'completed';
+          downloadJobs[jobId].progress = 100;
+          console.log(`Job ${jobId} completed successfully! File URL: ${downloadJobs[jobId].fileUrl}`);
+        } catch (err) {
+          console.error(`Async video watermarking failed for job ${jobId}:`, err);
+          downloadJobs[jobId].status = 'failed';
+          downloadJobs[jobId].error = err.message;
+        }
+      })();
+
+      return res.status(202).json({
+        success: true,
+        data: {
+          jobId,
+          type: material.type,
+          title: material.title,
+          downloadCount: user.downloadCount,
+          subscriptionType: user.subscriptionType
+        }
+      });
     }
 
     // Response includes confirmation and the file URL for downloading
@@ -260,4 +314,83 @@ exports.downloadMaterial = async (req, res) => {
       error: err.message
     });
   }
+};
+
+// @desc    Direct download forcing attachment header
+// @route   GET /api/materials/download-direct
+// @access  Public
+exports.downloadDirect = async (req, res) => {
+  try {
+    const { file, name } = req.query;
+    if (!file) {
+      return res.status(400).send('File path is required');
+    }
+
+    if (file.startsWith('http://') || file.startsWith('https://')) {
+      const axios = require('axios');
+      const response = await axios({
+        url: file,
+        method: 'GET',
+        responseType: 'stream'
+      });
+      
+      const cleanName = name || path.basename(new URL(file).pathname);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(cleanName)}"`);
+      res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
+      response.data.pipe(res);
+      return;
+    }
+
+    // Resolve path safely (strip leading slash/backslash to prevent path.join from treating it as root on Windows)
+    const cleanFile = file.replace(/^[/\\]+/, '');
+    const normalizedFile = path.normalize(cleanFile).replace(/^(\.\.(\/|\\))+/, '');
+    const absolutePath = path.join(__dirname, '..', normalizedFile);
+    console.log(`Direct download resolving file path: ${absolutePath}`);
+
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).send('File not found');
+    }
+
+    res.download(absolutePath, name || path.basename(absolutePath), (err) => {
+      if (err) {
+        if (err.code !== 'ECONNABORTED' && err.message !== 'Request aborted') {
+          console.error('Download callback error:', err);
+        } else {
+          console.log('Download request was aborted or finished by the client.');
+        }
+      }
+      // Delete temp watermarked video file immediately to free server storage
+      if (path.basename(absolutePath).startsWith('watermarked-')) {
+        fs.unlink(absolutePath, (unlinkErr) => {
+          if (unlinkErr) {
+            console.error('Failed to delete temporary watermarked file:', unlinkErr);
+          } else {
+            console.log('Successfully deleted temporary watermarked file:', absolutePath);
+          }
+        });
+      }
+    });
+  } catch (err) {
+    console.error('Direct download error:', err);
+    res.status(500).send('Server Error during download');
+  }
+};
+
+// @desc    Get download job status/progress
+// @route   GET /api/materials/download-job/:jobId
+// @access  Public
+exports.getDownloadJobStatus = async (req, res) => {
+  const { jobId } = req.params;
+  const job = downloadJobs[jobId];
+  if (!job) {
+    return res.status(404).json({
+      success: false,
+      error: 'Job not found'
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    data: job
+  });
 };
