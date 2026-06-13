@@ -56,8 +56,26 @@ const uploadFile = async (file) => {
 
   // If file is a video or reel, compress it using ffmpeg
   if (file.mimetype.startsWith('video/')) {
-    const ffmpegPath = require('ffmpeg-static');
-    const { execFile } = require('child_process');
+    const { execFile, execSync } = require('child_process');
+    
+    // Dynamically resolve ffmpeg path to support Alpine production and local Windows dev
+    let ffmpegPath = 'ffmpeg';
+    try {
+      const ffmpegStatic = require('ffmpeg-static');
+      if (process.platform === 'win32') {
+        ffmpegPath = ffmpegStatic;
+      } else {
+        try {
+          execSync('which ffmpeg', { stdio: 'ignore' });
+          ffmpegPath = 'ffmpeg';
+        } catch (_) {
+          ffmpegPath = ffmpegStatic;
+        }
+      }
+    } catch (e) {
+      ffmpegPath = 'ffmpeg';
+    }
+
     const uploadDir = path.join(__dirname, '../../uploads');
     
     if (!fs.existsSync(uploadDir)) {

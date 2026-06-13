@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# Install system-wide ffmpeg
+RUN apk add --no-cache ffmpeg
+
 WORKDIR /app
 
 # Copy package files and install dependencies
