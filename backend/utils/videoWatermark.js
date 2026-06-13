@@ -146,14 +146,22 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
   let profilePhotoBase64 = '';
   if (agent.profilePhoto) {
     try {
-      let photoPath = agent.profilePhoto.startsWith('/uploads')
-        ? path.join(__dirname, '../..', agent.profilePhoto)
-        : agent.profilePhoto;
-      
-      if (fs.existsSync(photoPath)) {
-        const photoBuffer = fs.readFileSync(photoPath);
-        const mimeType = agent.profilePhoto.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      if (agent.profilePhoto.startsWith('http')) {
+        const axios = require('axios');
+        const response = await axios.get(agent.profilePhoto, { responseType: 'arraybuffer' });
+        const photoBuffer = Buffer.from(response.data);
+        const mimeType = response.headers['content-type'] || 'image/jpeg';
         profilePhotoBase64 = `data:${mimeType};base64,${photoBuffer.toString('base64')}`;
+      } else {
+        let photoPath = agent.profilePhoto.startsWith('/uploads')
+          ? path.join(__dirname, '../..', agent.profilePhoto)
+          : agent.profilePhoto;
+        
+        if (fs.existsSync(photoPath)) {
+          const photoBuffer = fs.readFileSync(photoPath);
+          const mimeType = agent.profilePhoto.endsWith('.png') ? 'image/png' : 'image/jpeg';
+          profilePhotoBase64 = `data:${mimeType};base64,${photoBuffer.toString('base64')}`;
+        }
       }
     } catch (photoErr) {
       console.error('Failed to read profile photo for watermark:', photoErr);
@@ -164,14 +172,22 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
   let logoBase64 = '';
   if (config.logoUrl) {
     try {
-      let logoPath = config.logoUrl.startsWith('/uploads')
-        ? path.join(__dirname, '../..', config.logoUrl)
-        : config.logoUrl;
-      
-      if (fs.existsSync(logoPath)) {
-        const logoBuffer = fs.readFileSync(logoPath);
-        const mimeType = config.logoUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      if (config.logoUrl.startsWith('http')) {
+        const axios = require('axios');
+        const response = await axios.get(config.logoUrl, { responseType: 'arraybuffer' });
+        const logoBuffer = Buffer.from(response.data);
+        const mimeType = response.headers['content-type'] || 'image/png';
         logoBase64 = `data:${mimeType};base64,${logoBuffer.toString('base64')}`;
+      } else {
+        let logoPath = config.logoUrl.startsWith('/uploads')
+          ? path.join(__dirname, '../..', config.logoUrl)
+          : config.logoUrl;
+        
+        if (fs.existsSync(logoPath)) {
+          const logoBuffer = fs.readFileSync(logoPath);
+          const mimeType = config.logoUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+          logoBase64 = `data:${mimeType};base64,${logoBuffer.toString('base64')}`;
+        }
       }
     } catch (logoErr) {
       console.error('Failed to read logo for watermark:', logoErr);
