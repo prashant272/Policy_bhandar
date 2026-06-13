@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Install system-wide ffmpeg
-RUN apk add --no-cache ffmpeg
+# Install system-wide ffmpeg, fontconfig, and system fonts
+RUN apk add --no-cache ffmpeg fontconfig font-noto ttf-dejavu && fc-cache -fv
 
 WORKDIR /app
 
