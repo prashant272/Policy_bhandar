@@ -433,3 +433,25 @@ nav.absolute.bg-transparent button:hover {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
+
+/* Premium Dropdown Custom Scrollbar & Scroll Chaining Prevention */
+.dropdown-scrollbar {
+  overscroll-behavior-y: contain;
+}
+
+.dropdown-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dropdown-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.4) !important; /* Premium orange thumb */
+  border-radius: 3px;
+}
+
+.dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(234, 88, 12, 0.7) !important;
+}

@@ -23,11 +23,18 @@ const buildSubcategoryTree = (items, parentId = null) => {
   return branch;
 };
 
-const SubcategoryDropdownNode = ({ node }) => {
+const SubcategoryDropdownNode = ({ node, depth = 2, openMenuIds = [], handleItemHover, parentPath = [] }) => {
   const hasChildren = node.children && node.children.length > 0;
+  const isChildrenFlat = !node.children?.some(child => child.children && child.children.length > 0);
+
+  const isVisible = openMenuIds.includes(node._id);
+  const currentPath = [...parentPath, node._id];
 
   return (
-    <div className="relative group/sub w-full">
+    <div 
+      className="w-full"
+      onMouseEnter={() => handleItemHover(node._id, parentPath)}
+    >
       {hasChildren ? (
         <div className="w-full">
           {node.isClickable !== false ? (
@@ -44,10 +51,17 @@ const SubcategoryDropdownNode = ({ node }) => {
               <span className="text-gray-500 text-[9px]">▶</span>
             </div>
           )}
-          {/* Sub-dropdown to the right */}
-          <div className="absolute left-full top-0 ml-1 w-56 glass-effect border border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible transition-all duration-200 p-2 z-50">
+          {/* Sub-dropdown to the right or left depending on depth */}
+          <div className={`absolute ${depth >= 4 ? 'right-full mr-1' : 'left-full ml-1'} top-0 w-48 glass-effect border border-white/10 rounded-xl shadow-xl p-2 z-50 ${isVisible ? 'block' : 'hidden'} ${isChildrenFlat ? 'max-h-[80vh] overflow-y-auto dropdown-scrollbar' : ''}`}>
             {node.children.map(child => (
-              <SubcategoryDropdownNode key={child._id} node={child} />
+              <SubcategoryDropdownNode 
+                key={child._id} 
+                node={child} 
+                depth={depth + 1} 
+                openMenuIds={openMenuIds}
+                handleItemHover={handleItemHover}
+                parentPath={currentPath}
+              />
             ))}
           </div>
         </div>
@@ -71,6 +85,128 @@ const SubcategoryDropdownNode = ({ node }) => {
   );
 };
 
+const MobileNavNode = ({ node, depth = 1, onCloseMenu }) => {
+  const hasChildren = node.children && node.children.length > 0;
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="w-full">
+      <div 
+        className="flex items-center justify-between py-2 pl-2 cursor-pointer border-b border-white/5"
+        onClick={() => {
+          if (hasChildren) {
+            setIsExpanded(!isExpanded);
+          } else {
+            onCloseMenu();
+          }
+        }}
+      >
+        {node.isClickable !== false && !hasChildren ? (
+          <Link
+            to={`/category/${node.categoryId || node._id}?subcat=${node._id}`}
+            className="text-sm text-gray-300 hover:text-white flex-grow text-left"
+          >
+            {node.name}
+          </Link>
+        ) : (
+          <span className="text-sm text-gray-300 flex-grow text-left">{node.name}</span>
+        )}
+        
+        {hasChildren && (
+          <button className="p-1 text-gray-400 hover:text-white focus:outline-none text-xs">
+            {isExpanded ? '▼' : '▶'}
+          </button>
+        )}
+      </div>
+
+      {hasChildren && isExpanded && (
+        <div className="pl-3 border-l border-white/10 ml-3 mt-1 space-y-1">
+          {node.isClickable !== false && (
+            <div className="py-1.5 pl-2">
+              <Link
+                to={`/category/${node.categoryId || node._id}?subcat=${node._id}`}
+                onClick={onCloseMenu}
+                className="text-xs text-orange-400 font-semibold hover:text-orange-300 block text-left"
+              >
+                View All {node.name}
+              </Link>
+            </div>
+          )}
+          {node.children.map(child => (
+            <MobileNavNode 
+              key={child._id} 
+              node={child} 
+              depth={depth + 1} 
+              onCloseMenu={onCloseMenu} 
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MobileCategoryAccordion = ({ cat, catSubs, buildSubcategoryTree, onCloseMenu }) => {
+  const subTree = buildSubcategoryTree(catSubs);
+  const hasSubs = subTree.length > 0;
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="w-full border-b border-white/5 py-1">
+      <div 
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => {
+          if (hasSubs) {
+            setIsExpanded(!isExpanded);
+          } else {
+            onCloseMenu();
+          }
+        }}
+      >
+        {cat.isClickable !== false && !hasSubs ? (
+          <Link
+            to={`/category/${cat._id}`}
+            className="block py-2 text-base font-semibold text-gray-300 hover:text-white flex-grow text-left"
+          >
+            {cat.name}
+          </Link>
+        ) : (
+          <span className="block py-2 text-base font-semibold text-gray-300 hover:text-white flex-grow text-left">{cat.name}</span>
+        )}
+
+        {hasSubs && (
+          <button className="p-1.5 text-gray-400 hover:text-white text-xs">
+            {isExpanded ? '▼' : '▶'}
+          </button>
+        )}
+      </div>
+
+      {hasSubs && isExpanded && (
+        <div className="pl-3 space-y-1 mt-1">
+          {cat.isClickable !== false && (
+            <div className="py-1.5 pl-2">
+              <Link
+                to={`/category/${cat._id}`}
+                onClick={onCloseMenu}
+                className="text-sm text-orange-400 font-semibold hover:text-orange-300 block text-left"
+              >
+                View All {cat.name}
+              </Link>
+            </div>
+          )}
+          {subTree.map(subNode => (
+            <MobileNavNode 
+              key={subNode._id} 
+              node={subNode} 
+              onCloseMenu={onCloseMenu} 
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function Navbar({ onOpenProfileModal, categories = [] }) {
   const location = useLocation();
   const isHomePage = location.pathname === '/';
@@ -79,6 +215,32 @@ export default function Navbar({ onOpenProfileModal, categories = [] }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [subcategoriesMap, setSubcategoriesMap] = useState({});
   const [isScrolled, setIsScrolled] = useState(false);
+  const [openMenuIds, setOpenMenuIds] = useState([]);
+  const [isLocked, setIsLocked] = useState(false);
+  const [isHoveringServices, setIsHoveringServices] = useState(false);
+
+  const handleItemHover = (id, parentPath = []) => {
+    setOpenMenuIds([...parentPath, id]);
+  };
+
+  const handleServicesMouseLeave = () => {
+    if (!isLocked) {
+      setIsHoveringServices(false);
+      setOpenMenuIds([]);
+    }
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.services-dropdown-container')) {
+        setIsLocked(false);
+        setIsHoveringServices(false);
+        setOpenMenuIds([]);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -169,52 +331,70 @@ export default function Navbar({ onOpenProfileModal, categories = [] }) {
             <Link to="/" className={linkClass}>Home</Link>
             
             {/* Category Dropdown */}
-            <div className="relative group">
+            <div 
+              className="relative group services-dropdown-container"
+              onMouseEnter={() => setIsHoveringServices(true)}
+              onMouseLeave={handleServicesMouseLeave}
+              onClick={() => setIsLocked(true)}
+            >
               <button className={`flex items-center space-x-1 ${linkClass}`}>
                 Our Services
                 <ChevronDown size={14} className="transition-colors" />
               </button>
               
-              <div className="absolute top-full left-0 mt-1 w-56 glass-effect border border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 p-2 z-50">
+              <div className={`absolute top-full left-0 mt-1 w-48 glass-effect border border-white/10 rounded-xl shadow-xl transition-all duration-200 p-2 z-50 ${(isHoveringServices || isLocked) ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 {categories.length > 0 ? (
                   categories.map((cat) => {
-                    const catSubs = subcategoriesMap[cat._id] || [];
-                    const subTree = buildSubcategoryTree(catSubs);
-                    const hasSubs = subTree.length > 0;
+                     const catSubs = subcategoriesMap[cat._id] || [];
+                     const subTree = buildSubcategoryTree(catSubs);
+                     const hasSubs = subTree.length > 0;
+                     const isFlatList = !subTree.some(node => node.children && node.children.length > 0);
+                     const isCatVisible = openMenuIds.includes(cat._id);
 
-                    return (
-                      <div key={cat._id} className="relative group/cat w-full">
-                        {cat.isClickable !== false ? (
-                          <Link 
-                            to={`/category/${cat._id}`}
-                            className="flex items-center justify-between w-full px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors text-left"
-                          >
-                            <span>{cat.name}</span>
-                            {hasSubs && <span className="text-gray-500 text-[10px]">▶</span>}
-                          </Link>
-                        ) : (
-                          <div className="flex items-center justify-between w-full px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
-                            <span>{cat.name}</span>
-                            {hasSubs && <span className="text-gray-500 text-[10px]">▶</span>}
-                          </div>
-                        )}
-                        
-                        {/* Subcategories Dropdown Flyout */}
-                        {hasSubs && (
-                          <div className="absolute left-full top-0 ml-1 w-56 glass-effect border border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover/cat:opacity-100 group-hover/cat:visible transition-all duration-200 p-2 z-50">
-                            {subTree.map(subNode => (
-                              <SubcategoryDropdownNode key={subNode._id} node={subNode} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <span className="block px-4 py-2 text-xs text-gray-500">No categories loaded</span>
-                )}
-              </div>
-            </div>
+                     return (
+                       <div 
+                         key={cat._id} 
+                         className="w-full"
+                         onMouseEnter={() => handleItemHover(cat._id, [])}
+                       >
+                         {cat.isClickable !== false ? (
+                           <Link 
+                             to={`/category/${cat._id}`}
+                             className="flex items-center justify-between w-full px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors text-left"
+                           >
+                             <span>{cat.name}</span>
+                             {hasSubs && <span className="text-gray-500 text-[10px]">▶</span>}
+                           </Link>
+                         ) : (
+                           <div className="flex items-center justify-between w-full px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
+                             <span>{cat.name}</span>
+                             {hasSubs && <span className="text-gray-500 text-[10px]">▶</span>}
+                           </div>
+                         )}
+                         
+                         {/* Subcategories Dropdown Flyout */}
+                         {hasSubs && (
+                           <div className={`absolute left-full top-0 ml-1 w-48 glass-effect border border-white/10 rounded-xl shadow-xl p-2 z-50 ${isCatVisible ? 'block' : 'hidden'} ${isFlatList ? 'max-h-[80vh] overflow-y-auto dropdown-scrollbar' : ''}`}>
+                             {subTree.map(subNode => (
+                               <SubcategoryDropdownNode 
+                                 key={subNode._id} 
+                                 node={subNode} 
+                                 depth={2}
+                                 openMenuIds={openMenuIds}
+                                 handleItemHover={handleItemHover}
+                                 parentPath={[cat._id]}
+                               />
+                             ))}
+                           </div>
+                         )}
+                       </div>
+                     );
+                   })
+                 ) : (
+                   <span className="block px-4 py-2 text-xs text-gray-500">No categories loaded</span>
+                 )}
+               </div>
+             </div>
 
             <Link to="/training" className={linkClass}>Training</Link>
             <Link to="/blogs" className={linkClass}>Blogs</Link>
@@ -299,56 +479,48 @@ export default function Navbar({ onOpenProfileModal, categories = [] }) {
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden glass-effect border-b border-white/10 px-4 pt-2 pb-4 space-y-2">
+        <div className="fixed inset-x-0 bottom-0 top-16 md:hidden glass-effect border-b border-white/10 px-6 py-6 space-y-4 overflow-y-auto dropdown-scrollbar overscroll-contain z-40 bg-slate-950/95 backdrop-blur-xl">
           <Link
             to="/"
             onClick={() => setIsOpen(false)}
-            className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5"
+            className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5 text-left"
           >
             Home
           </Link>
           
           <div className="px-3 py-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Our Services</p>
-            {categories.map((cat) => (
-              cat.isClickable !== false ? (
-                <Link
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 text-left">Our Services</p>
+            <div className="space-y-1">
+              {categories.map((cat) => (
+                <MobileCategoryAccordion
                   key={cat._id}
-                  to={`/category/${cat._id}`}
-                  onClick={() => setIsOpen(false)}
-                  className="block pl-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-md"
-                >
-                  {cat.name}
-                </Link>
-              ) : (
-                <div
-                  key={cat._id}
-                  className="block pl-3 py-1.5 text-sm text-gray-500 cursor-default rounded-md"
-                >
-                  {cat.name}
-                </div>
-              )
-            ))}
+                  cat={cat}
+                  catSubs={subcategoriesMap[cat._id] || []}
+                  buildSubcategoryTree={buildSubcategoryTree}
+                  onCloseMenu={() => setIsOpen(false)}
+                />
+              ))}
+            </div>
           </div>
 
           <Link
             to="/training"
             onClick={() => setIsOpen(false)}
-            className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5"
+            className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5 text-left"
           >
             Training
           </Link>
           <Link
             to="/blogs"
             onClick={() => setIsOpen(false)}
-            className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5"
+            className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5 text-left"
           >
             Blogs
           </Link>
           <Link
             to="/pricing"
             onClick={() => setIsOpen(false)}
-            className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5"
+            className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5 text-left"
           >
             Pricing
           </Link>
@@ -358,7 +530,7 @@ export default function Navbar({ onOpenProfileModal, categories = [] }) {
               <div className="w-full h-12 bg-white/10 animate-pulse rounded-xl mx-3"></div>
             ) : user ? (
               <div className="space-y-2 px-3">
-                <p className="text-sm font-semibold text-white">Signed in as {user.name}</p>
+                <p className="text-sm font-semibold text-white text-left">Signed in as {user.name}</p>
                 <button
                   onClick={() => {
                     setIsOpen(false);
