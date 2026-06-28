@@ -31,46 +31,64 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
 
 
 
-        // 1. Load main image
-        const img = await new Promise((res, rej) => {
-          const i = new Image();
-          i.crossOrigin = 'anonymous';
-          i.onload = () => res(i);
-          i.onerror = () => rej(new Error('Failed to load main image for watermarking'));
-          i.src = imageUrl;
+        // 1. Load main image via fetch to bypass Image CORS quirks and get better errors
+        const img = await new Promise(async (res, rej) => {
+          try {
+            const response = await fetch(imageUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            
+            const i = new Image();
+            i.onload = () => {
+              // URL.revokeObjectURL(objectUrl); // Optional cleanup
+              res(i);
+            };
+            i.onerror = () => rej(new Error('Failed to decode image from blob'));
+            i.src = objectUrl;
+          } catch (e) {
+            rej(new Error('Failed to load main image for watermarking: ' + e.message));
+          }
         });
+
+        const apiBase = `${window.location.protocol}//${window.location.hostname}:5000/api`;
+
+        // Helper to load image via proxy/fetch
+        const loadImageSecurely = async (url) => {
+          let proxyUrl = url;
+          if (url.startsWith('http') && !url.includes(window.location.hostname)) {
+            proxyUrl = `${apiBase}/materials/download-proxy?url=${encodeURIComponent(url)}`;
+          } else if (url.startsWith('/uploads')) {
+            proxyUrl = `${window.location.protocol}//${window.location.hostname}:5000${url}`;
+          }
+
+          try {
+            const response = await fetch(proxyUrl);
+            if (!response.ok) return null;
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            
+            return await new Promise((res) => {
+              const img = new Image();
+              img.onload = () => res(img);
+              img.onerror = () => res(null);
+              img.src = objectUrl;
+            });
+          } catch (e) {
+            return null;
+          }
+        };
 
         // 2. Load agent profile photo (avatar) if configured
         let avatar = null;
         if (config.showUserPhoto && agent.profilePhoto) {
-          let photoUrl = agent.profilePhoto;
-          if (photoUrl.startsWith('/uploads')) {
-            photoUrl = `${window.location.protocol}//${window.location.hostname}:5000${photoUrl}`;
-          }
-
-          avatar = await new Promise((res) => {
-            const a = new Image();
-            a.crossOrigin = 'anonymous';
-            a.onload = () => res(a);
-            a.onerror = () => res(null);
-            a.src = photoUrl;
-          });
+          avatar = await loadImageSecurely(agent.profilePhoto);
         }
 
         // 3. Load custom logo if configured
         let logo = null;
         if (config.logoUrl) {
-          let logoSrc = config.logoUrl;
-          if (logoSrc.startsWith('/uploads')) {
-            logoSrc = `${window.location.protocol}//${window.location.hostname}:5000${logoSrc}`;
-          }
-          logo = await new Promise((res) => {
-            const l = new Image();
-            l.crossOrigin = 'anonymous';
-            l.onload = () => res(l);
-            l.onerror = () => res(null);
-            l.src = logoSrc;
-          });
+          logo = await loadImageSecurely(config.logoUrl);
         }
 
         // 4. Configure Canvas
@@ -182,6 +200,11 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
           ctx.strokeStyle = config.accentColor || '#000000';
           ctx.stroke();
 
+          let activeTextColor = config.textColor;
+          if (activeTextColor.toLowerCase() === '#ffffff' || activeTextColor.toLowerCase() === '#fff' || activeTextColor.toLowerCase() === 'white') {
+            activeTextColor = '#0f172a'; // Force dark text on white background
+          }
+
           if (logo) {
             const imgSize = boxSize * 0.9;
             const offset = (boxSize - imgSize) / 2;
@@ -194,7 +217,7 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.font = `bold ${Math.round(boxSize * 0.4)}px "Plus Jakarta Sans", sans-serif`;
-            ctx.fillStyle = config.textColor;
+            ctx.fillStyle = activeTextColor;
             ctx.fillText(agent.name.charAt(0), boxX + boxSize / 2, boxY + boxSize / 2);
           }
 
@@ -207,7 +230,7 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
           const lineSpacing = Math.round(cardHeight * 0.12);
 
           ctx.font = `${Math.round(cardHeight * 0.1)}px "Plus Jakarta Sans", sans-serif`;
-          ctx.fillStyle = config.textColor;
+          ctx.fillStyle = activeTextColor;
           ctx.fillText('With Best Regards,', currentX, textY);
           textY += lineSpacing * 1.2;
 

@@ -50,7 +50,7 @@ exports.createSubcategory = async (req, res) => {
 // @access  Private (SuperAdmin, SubAdmin)
 exports.uploadMaterial = async (req, res) => {
   try {
-    const { title, categoryId, subcategoryId, type, companyName, tags, isPremium, watermarkTemplateId } = req.body;
+    const { title, categoryId, subcategoryId, type, companyName, tags, isPremium, watermarkTemplateId, language } = req.body;
 
     // Check files uploaded (req.files or req.file)
     // For MVP, we will assume files are uploaded, or URLs are provided manually if files are mock
@@ -105,6 +105,7 @@ exports.uploadMaterial = async (req, res) => {
       tags: parsedTags || [],
       isPremium: isPremium === 'true' || isPremium === true,
       watermarkTemplateId: watermarkTemplateId || null,
+      language: language || 'English',
       uploadedBy: req.user.id
     });
 
@@ -212,7 +213,7 @@ exports.getContacts = async (req, res) => {
 // @access  Private (SuperAdmin, SubAdmin)
 exports.updateMaterial = async (req, res) => {
   try {
-    const { title, categoryId, subcategoryId, type, companyName, tags, isPremium, fileUrl, thumbnail, watermarkTemplateId } = req.body;
+    const { title, categoryId, subcategoryId, type, companyName, tags, isPremium, fileUrl, thumbnail, watermarkTemplateId, language } = req.body;
 
     let material = await Material.findById(req.params.id);
     if (!material) {
@@ -229,6 +230,10 @@ exports.updateMaterial = async (req, res) => {
       isPremium: isPremium === 'true' || isPremium === true || isPremium === '1',
       watermarkTemplateId: watermarkTemplateId || null
     };
+
+    if (language) {
+      updateData.language = language;
+    }
 
     if (tags) {
       updateData.tags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : tags;

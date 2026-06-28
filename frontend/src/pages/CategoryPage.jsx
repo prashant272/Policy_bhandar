@@ -13,14 +13,19 @@ export default function CategoryPage({ onOpenAuthModal }) {
   const searchParamQuery = searchParams.get('search') || '';
 
   const [categoryName, setCategoryName] = useState('All Materials');
+  const [breadcrumbPath, setBreadcrumbPath] = useState([]);
   const [selectedSubcat, setSelectedSubcat] = useState(searchParams.get('subcat') || '');
   
   // Tags
   const [availableTags, setAvailableTags] = useState([]);
   const [selectedTag, setSelectedTag] = useState('');
   
+  // Language filter
+  const [selectedLanguage, setSelectedLanguage] = useState('');
+  
   // Materials list
   const [materials, setMaterials] = useState([]);
+  const [activePreviewId, setActivePreviewId] = useState(null);
   const [materialType, setMaterialType] = useState(''); // Banner, Reel, PDF
   const [searchQuery, setSearchQuery] = useState(searchParamQuery);
   const [page, setPage] = useState(1);
@@ -31,6 +36,7 @@ export default function CategoryPage({ onOpenAuthModal }) {
   const fetchCategoryMeta = async () => {
     if (!categoryId || categoryId === 'all') {
       setCategoryName('All Materials');
+      setBreadcrumbPath([]);
       setAvailableTags([]);
       return;
     }
@@ -43,8 +49,34 @@ export default function CategoryPage({ onOpenAuthModal }) {
         if (currentCat) setCategoryName(currentCat.name);
       }
       
-      // Fetch available tags
       const currentSubcat = searchParams.get('subcat') || '';
+      
+      // Fetch Subcategory Hierarchy
+      if (currentSubcat) {
+        try {
+          const subcatRes = await API.get(`/materials/categories/${categoryId}/subcategories`);
+          if (subcatRes.data.success) {
+            const allSubcats = subcatRes.data.data;
+            const path = [];
+            let current = allSubcats.find(s => s._id === currentSubcat);
+            while (current) {
+              path.unshift({ _id: current._id, name: current.name });
+              if (current.parentSubcategoryId) {
+                current = allSubcats.find(s => s._id === current.parentSubcategoryId);
+              } else {
+                current = null;
+              }
+            }
+            setBreadcrumbPath(path);
+          }
+        } catch(err) {
+          setBreadcrumbPath([]);
+        }
+      } else {
+        setBreadcrumbPath([]);
+      }
+
+      // Fetch available tags
       let tagUrl = `/materials/tags?categoryId=${categoryId}`;
       if (currentSubcat) tagUrl += `&subcategoryId=${currentSubcat}`;
       const tagRes = await API.get(tagUrl);
@@ -74,6 +106,9 @@ export default function CategoryPage({ onOpenAuthModal }) {
       if (selectedTag) {
         queryUrl += `&tag=${encodeURIComponent(selectedTag)}`;
       }
+      if (selectedLanguage) {
+        queryUrl += `&language=${selectedLanguage}`;
+      }
       if (searchQuery) {
         queryUrl += `&search=${searchQuery}`;
       }
@@ -99,12 +134,13 @@ export default function CategoryPage({ onOpenAuthModal }) {
     setTimeout(() => {
       setPage(1);
       setSelectedTag(''); // Reset tag when category/subcat changes
+      setSelectedLanguage(''); // Reset language when category/subcat changes
     }, 0);
   }, [categoryId, searchParams]);
 
   useEffect(() => {
     fetchMaterials();
-  }, [categoryId, selectedSubcat, materialType, searchQuery, selectedTag, page]);
+  }, [categoryId, selectedSubcat, materialType, searchQuery, selectedTag, selectedLanguage, page]);
 
   // Keep search bar in sync with URL search query
   useEffect(() => {
@@ -140,7 +176,23 @@ export default function CategoryPage({ onOpenAuthModal }) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
         <div>
           <Link to="/" className="text-xs text-indigo-400 hover:underline">← Back to home</Link>
-          <h1 className="text-3xl font-extrabold text-white mt-1">{categoryName}</h1>
+          <h1 className="text-3xl font-extrabold text-white mt-1 flex items-center flex-wrap gap-2">
+            <Link to={`/category/${categoryId}`} onClick={() => setSelectedSubcat('')} className="hover:text-indigo-400 transition-colors">
+              {categoryName}
+            </Link>
+            {breadcrumbPath.map((crumb, idx) => (
+              <React.Fragment key={crumb._id}>
+                <span className="text-indigo-400/50 font-medium text-2xl">/</span>
+                <Link
+                  to={`/category/${categoryId}?subcat=${crumb._id}`}
+                  onClick={() => setSelectedSubcat(crumb._id)}
+                  className={`${idx === breadcrumbPath.length - 1 ? 'text-indigo-400' : 'text-gray-300 hover:text-indigo-400'} transition-colors font-medium text-2xl`}
+                >
+                  {crumb.name}
+                </Link>
+              </React.Fragment>
+            ))}
+          </h1>
           <p className="text-xs text-gray-400 mt-1">Discover, preview, and download templates.</p>
         </div>
 
@@ -186,37 +238,66 @@ export default function CategoryPage({ onOpenAuthModal }) {
         {/* Materials Grid Area */}
         <div className="w-full space-y-6">
           
-          {/* Tags Row */}
-          {availableTags.length > 0 && (
-            <div className="flex items-center flex-wrap gap-2 pb-4 border-b border-white/5">
+          {/* Filters Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
+            {/* Tags Filter */}
+            <div className="flex items-center flex-wrap gap-2">
+              {availableTags.length > 0 && (
+                <>
+                  <span className="text-xs font-semibold text-gray-400 flex items-center mr-2">
+                    <Tag size={12} className="mr-1" /> Tags:
+                  </span>
+                  <button
+                    onClick={() => setSelectedTag('')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      selectedTag === '' 
+                        ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' 
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {availableTags.filter(tag => tag && tag.trim() !== '').map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => setSelectedTag(tag)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        selectedTag === tag 
+                          ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' 
+                          : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+
+            {/* Language Filter */}
+            <div className="flex items-center flex-wrap gap-2">
               <span className="text-xs font-semibold text-gray-400 flex items-center mr-2">
-                <Tag size={12} className="mr-1" /> Filters:
+                Language:
               </span>
-              <button
-                onClick={() => setSelectedTag('')}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  selectedTag === '' 
-                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' 
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                All
-              </button>
-              {availableTags.map(tag => (
+              {[
+                { name: 'All', value: '' },
+                { name: 'English', value: 'English' },
+                { name: 'Hindi', value: 'Hindi' },
+              ].map(lang => (
                 <button
-                  key={tag}
-                  onClick={() => setSelectedTag(tag)}
+                  key={lang.value}
+                  onClick={() => setSelectedLanguage(lang.value)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    selectedTag === tag 
-                      ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' 
+                    selectedLanguage === lang.value 
+                      ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' 
                       : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  {tag}
+                  {lang.name}
                 </button>
               ))}
             </div>
-          )}
+          </div>
 
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -227,11 +308,17 @@ export default function CategoryPage({ onOpenAuthModal }) {
           ) : materials.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {materials.map((material) => (
+                {materials.map((material, index) => (
                   <MaterialCard
                     key={material._id}
                     material={material}
                     onOpenAuthModal={onOpenAuthModal}
+                    activePreviewId={activePreviewId}
+                    setActivePreviewId={setActivePreviewId}
+                    onPrev={() => setActivePreviewId(materials[index - 1]?._id)}
+                    hasPrev={index > 0}
+                    onNext={() => setActivePreviewId(materials[index + 1]?._id)}
+                    hasNext={index < materials.length - 1}
                   />
                 ))}
               </div>

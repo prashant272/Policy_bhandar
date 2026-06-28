@@ -51,7 +51,7 @@ exports.getSubcategories = async (req, res) => {
 // @access  Public
 exports.getMaterials = async (req, res) => {
   try {
-    const { categoryId, subcategoryId, type, companyName, search, tag, page = 1, limit = 12 } = req.query;
+    const { categoryId, subcategoryId, type, companyName, search, tag, language, page = 1, limit = 12 } = req.query;
 
     const query = {};
 
@@ -83,6 +83,15 @@ exports.getMaterials = async (req, res) => {
       }
     }
     if (tag) query.tags = tag;
+    if (language) {
+      if (language === 'Both') {
+        query.language = 'Both';
+      } else if (language === 'English') {
+        query.language = { $in: ['English', 'Both', null] };
+      } else {
+        query.language = { $in: [language, 'Both'] };
+      }
+    }
     if (companyName) query.companyName = { $regex: companyName, $options: 'i' };
     
     if (search) {
@@ -313,6 +322,39 @@ exports.downloadMaterial = async (req, res) => {
       success: false,
       error: err.message
     });
+  }
+};
+
+// @desc    Download external file proxy (Bypass CORS)
+// @route   GET /api/materials/download-proxy
+// @access  Public
+exports.downloadProxy = async (req, res) => {
+  const { url: fileUrl, name } = req.query;
+  if (!fileUrl) return res.status(400).send('URL is required');
+
+  try {
+    const axios = require('axios');
+    const response = await axios({
+      method: 'GET',
+      url: fileUrl,
+      responseType: 'stream'
+    });
+
+    if (response.headers['content-type']) {
+      res.setHeader('Content-Type', response.headers['content-type']);
+    }
+    if (name) {
+      res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+    }
+    
+    // Add CORS headers so frontend canvas can use it
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    
+    response.data.pipe(res);
+  } catch (err) {
+    console.error('Proxy fetch error:', err.message);
+    res.status(500).send('Proxy error: ' + err.message);
   }
 };
 

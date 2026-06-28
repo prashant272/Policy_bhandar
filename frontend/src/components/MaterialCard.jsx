@@ -6,10 +6,33 @@ import { watermarkImage } from '../utils/watermark';
 import { watermarkPDF } from '../utils/pdfWatermark';
 import { Download, Eye, ShieldAlert, Sparkles, FileText, Video, Image as ImageIcon, FileCheck, X } from 'lucide-react';
 
-export default function MaterialCard({ material, onOpenAuthModal, onDownloadSuccess }) {
+export default function MaterialCard({ 
+  material, 
+  onOpenAuthModal, 
+  onDownloadSuccess,
+  activePreviewId,
+  setActivePreviewId,
+  onNext,
+  onPrev,
+  hasNext,
+  hasPrev
+}) {
   const { user } = useContext(AuthContext);
   const [downloading, setDownloading] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [internalPreviewOpen, setInternalPreviewOpen] = useState(false);
+  
+  const previewOpen = activePreviewId !== undefined ? activePreviewId === material._id : internalPreviewOpen;
+
+  const handleOpenPreview = () => {
+    if (setActivePreviewId) setActivePreviewId(material._id);
+    else setInternalPreviewOpen(true);
+  };
+
+  const handleClosePreview = () => {
+    if (setActivePreviewId) setActivePreviewId(null);
+    else setInternalPreviewOpen(false);
+  };
+
   const [previewUrl, setPreviewUrl] = useState(material.fileUrl);
   const [upgradePrompt, setUpgradePrompt] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -19,7 +42,12 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
 
   React.useEffect(() => {
     if (previewOpen && material.type === 'Banner' && user) {
-      watermarkImage(material.fileUrl, user, material.watermarkTemplateId)
+      const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
+      const proxyUrl = material.fileUrl.startsWith('http') 
+        ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}` 
+        : material.fileUrl;
+        
+      watermarkImage(proxyUrl, user, material.watermarkTemplateId)
         .then(url => setPreviewUrl(url))
         .catch(err => {
           console.error("Failed to generate watermarked preview:", err);
@@ -64,8 +92,15 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
 
     try {
       // 1. Call API to check/increment download count
-      console.log('Sending download request with resolution:', resolution);
-      const response = await API.post(`/materials/${material._id}/download`, { resolution });
+      const payload = {};
+      if (material.type === 'Reel' || material.type === 'Video') {
+        payload.resolution = resolution;
+        console.log('Sending download request with resolution:', resolution);
+      } else {
+        console.log('Sending download request for non-video material');
+      }
+
+      const response = await API.post(`/materials/${material._id}/download`, payload);
       
       if (response.data.success) {
         // Handle background job tracking if jobId returned
@@ -121,15 +156,24 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
 
         const fileUrl = response.data.data.fileUrl;
         
+        const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
+
         // 2. Perform Watermarking for Banners (Images)
         if (material.type === 'Banner') {
           try {
-            // Apply canvas overlay with template
-            const watermarkedDataUrl = await watermarkImage(material.fileUrl, user, material.watermarkTemplateId);
+            // Apply canvas overlay with template using proxy to avoid CORS
+            const proxyUrl = material.fileUrl.startsWith('http') 
+              ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}` 
+              : material.fileUrl;
+              
+            const watermarkedDataUrl = await watermarkImage(proxyUrl, user, material.watermarkTemplateId);
             await triggerDownload(watermarkedDataUrl, `${material.title}-watermarked.jpg`);
           } catch (err) {
             console.error('Watermarking failed, downloading raw file', err);
-            await triggerDownload(material.fileUrl, `${material.title}.jpg`);
+            const directUrl = material.fileUrl.startsWith('http')
+              ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}&name=${encodeURIComponent(material.title + '.jpg')}`
+              : material.fileUrl;
+            await triggerDownload(directUrl, `${material.title}.jpg`);
           }
         } else if (material.type === 'PDF' || material.type === 'Brochure') {
           try {
@@ -178,15 +222,25 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
       return;
     }
 
-    // Use a hidden iframe for downloads to prevent cross-origin page redirection
-    let iframe = document.getElementById('download-iframe');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = 'download-iframe';
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
+    if (url.startsWith('data:') || url.startsWith('blob:')) {
+      // Use anchor tag for data/blob URLs to force download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      // Use a hidden iframe for external URLs to prevent cross-origin page redirection
+      let iframe = document.getElementById('download-iframe');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'download-iframe';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+      }
+      iframe.src = url;
     }
-    iframe.src = url;
   };
 
   const renderHTMLOverlay = (isMini = false) => {
@@ -390,7 +444,7 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
     <div className="glass-effect rounded-2xl overflow-hidden border border-white/5 shadow-lg group hover:border-indigo-500/20 hover:shadow-indigo-500/5 transition-all duration-300">
       {/* Thumbnail Container (Click to Preview) */}
       <div 
-        onClick={() => setPreviewOpen(true)}
+        onClick={handleOpenPreview}
         className="relative aspect-video w-full overflow-hidden bg-slate-950 cursor-pointer group/thumb"
       >
         { (material.type === 'Reel' || material.type === 'Video') ? (
@@ -429,11 +483,26 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
           </span>
         )}
 
-        {/* Type Tag */}
-        <span className="absolute top-2 right-2 bg-black/60 backdrop-blur-md !text-white text-[9px] font-semibold px-1.5 py-0.5 rounded flex items-center space-x-1 border border-white/10">
-          {getIcon()}
-          <span>{material.type}</span>
-        </span>
+        {/* Language & Type Tags Container */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+          {/* Type Tag */}
+          <span className="bg-black/60 backdrop-blur-md !text-white text-[9px] font-semibold px-1.5 py-0.5 rounded flex items-center space-x-1 border border-white/10">
+            {getIcon()}
+            <span>{material.type}</span>
+          </span>
+          
+          {/* Language Tag */}
+          {material.language && material.language !== 'English' && (
+            <span className="bg-indigo-600/80 backdrop-blur-md !text-white text-[9px] font-semibold px-1.5 py-0.5 rounded border border-white/10 shadow-lg">
+              {material.language}
+            </span>
+          )}
+          {material.language === 'English' && (
+            <span className="bg-slate-700/80 backdrop-blur-md !text-white text-[9px] font-semibold px-1.5 py-0.5 rounded border border-white/10 shadow-lg">
+              EN
+            </span>
+          )}
+        </div>
 
         {/* Mini Thumbnail Watermark Overlay */}
         {renderHTMLOverlay(true)}
@@ -497,8 +566,32 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
             
             {/* Top Bar */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 bg-slate-900/50">
-              <h3 className="text-lg font-bold text-white line-clamp-1">{material.title}</h3>
-              <div className="flex items-center gap-3">
+              <h3 className="text-lg font-bold text-white line-clamp-1 flex-1 mr-4">{material.title}</h3>
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                
+                {/* Prev/Next Navigation */}
+                {(onPrev || onNext) && (
+                  <div className="flex bg-white/5 rounded-xl border border-white/10 overflow-hidden hidden sm:flex">
+                    <button
+                      onClick={onPrev}
+                      disabled={!hasPrev}
+                      className="px-4 py-2 font-bold text-gray-300 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                      title="Previous"
+                    >
+                      &larr; Prev
+                    </button>
+                    <div className="w-px bg-white/10"></div>
+                    <button
+                      onClick={onNext}
+                      disabled={!hasNext}
+                      className="px-4 py-2 font-bold text-gray-300 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                      title="Next"
+                    >
+                      Next &rarr;
+                    </button>
+                  </div>
+                )}
+
                 <button
                   onClick={handleDownload}
                   disabled={downloading}
@@ -526,8 +619,8 @@ export default function MaterialCard({ material, onOpenAuthModal, onDownloadSucc
                   </span>
                 </button>
                 <button
-                  onClick={() => setPreviewOpen(false)}
-                  className="p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors"
+                  onClick={handleClosePreview}
+                  className="p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
                 >
                   <X size={20} />
                 </button>

@@ -10,6 +10,7 @@ export default function PricingPage() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+  const [selectedPlanForConfirmation, setSelectedPlanForConfirmation] = useState(null);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -27,13 +28,17 @@ export default function PricingPage() {
     fetchPlans();
   }, []);
 
-  const handlePayment = async (plan) => {
+  const handlePaymentClick = (plan) => {
     if (!user) {
       window.alert('Please login to purchase a plan.');
       navigate('/login');
       return;
     }
+    setSelectedPlanForConfirmation(plan);
+  };
 
+  const processPayment = async (plan) => {
+    setSelectedPlanForConfirmation(null);
     setProcessingId(plan._id);
     try {
       // 1. Create order
@@ -199,7 +204,7 @@ export default function PricingPage() {
               </div>
 
               <button 
-                onClick={() => handlePayment(plan)}
+                onClick={() => handlePaymentClick(plan)}
                 disabled={processingId === plan._id}
                 className={`relative z-10 w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
                 isPopular 
@@ -225,6 +230,43 @@ export default function PricingPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      {selectedPlanForConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
+            <button 
+              onClick={() => setSelectedPlanForConfirmation(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              ✕
+            </button>
+            <h3 className="text-2xl font-black text-slate-900 mb-6 text-center">Confirm Payment</h3>
+            
+            <div className="space-y-4 mb-8">
+              <div className="flex justify-between text-slate-600 font-medium">
+                <span>Plan Price:</span>
+                <span>₹{selectedPlanForConfirmation.price}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 font-medium pb-4 border-b border-slate-100">
+                <span>GST (18%):</span>
+                <span>₹{Math.round(selectedPlanForConfirmation.price * 0.18)}</span>
+              </div>
+              <div className="flex justify-between text-xl font-black text-slate-900">
+                <span>Total Amount:</span>
+                <span>₹{Math.round(selectedPlanForConfirmation.price * 1.18)}</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => processPayment(selectedPlanForConfirmation)}
+              className="w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white bg-gradient-premium hover:bg-gradient-premium-hover shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300"
+            >
+              Proceed to Payment
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

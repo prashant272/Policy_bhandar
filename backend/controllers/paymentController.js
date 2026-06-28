@@ -25,9 +25,11 @@ exports.createOrder = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Plan not found' });
     }
 
+    const finalPrice = Math.round(plan.price * 1.18);
+
     // Amount should be in paise
     const options = {
-      amount: plan.price * 100, 
+      amount: finalPrice * 100, 
       currency: "INR",
       receipt: `receipt_order_${Date.now()}`,
     };
@@ -124,7 +126,7 @@ exports.createSubscription = async (req, res) => {
         interval: interval,
         item: {
           name: plan.name,
-          amount: plan.price * 100, // Amount in paise
+          amount: Math.round(plan.price * 1.18) * 100, // Amount in paise with 18% GST
           currency: 'INR',
           description: `${plan.name} Subscription`
         }

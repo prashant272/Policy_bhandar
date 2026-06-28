@@ -119,6 +119,7 @@ const TagInput = ({ value, onChange, availableTags }) => {
 export default function MaterialManager() {
   const [activeSubTab, setActiveSubTab] = useState('list'); // list or form
   const [materials, setMaterials] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [globalTags, setGlobalTags] = useState([]);
@@ -138,6 +139,7 @@ export default function MaterialManager() {
     categoryId: '',
     subcategoryId: '',
     type: 'Banner',
+    language: 'English',
     companyName: '',
     tags: '',
     isPremium: false,
@@ -215,6 +217,7 @@ export default function MaterialManager() {
       formData.append('categoryId', materialForm.categoryId);
       formData.append('subcategoryId', materialForm.subcategoryId);
       formData.append('type', materialForm.type);
+      formData.append('language', materialForm.language);
       formData.append('companyName', materialForm.companyName);
       formData.append('tags', materialForm.tags);
       formData.append('isPremium', materialForm.isPremium);
@@ -282,6 +285,7 @@ export default function MaterialManager() {
       categoryId: mat.categoryId?._id || mat.categoryId || '',
       subcategoryId: mat.subcategoryId?._id || mat.subcategoryId || '',
       type: mat.type,
+      language: mat.language || 'English',
       companyName: mat.companyName || '',
       tags: mat.tags?.join(', ') || '',
       isPremium: mat.isPremium || false,
@@ -301,6 +305,7 @@ export default function MaterialManager() {
       categoryId: categories[0]?._id || '',
       subcategoryId: '',
       type: 'Banner',
+      language: 'English',
       companyName: '',
       tags: '',
       isPremium: false,
@@ -311,6 +316,12 @@ export default function MaterialManager() {
 
   const subcategoryTree = buildSubcategoryTree(subcategories);
   const orderedSubcategories = flattenSubcategoryTree(subcategoryTree);
+
+  const filteredMaterials = materials.filter(mat => 
+    mat.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    mat.companyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    mat.type?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -377,13 +388,24 @@ export default function MaterialManager() {
 
       {/* List Sub-tab */}
       {activeSubTab === 'list' && (
-        <div className="glass-effect rounded-2xl border border-white/5 overflow-hidden shadow-xl">
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <input
+              type="text"
+              placeholder="Search by title, company, type..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-[#0b1021] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 w-full sm:w-80 shadow-md"
+            />
+          </div>
+          <div className="glass-effect rounded-2xl border border-white/5 overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-white/5 border-b border-white/10 text-gray-400 font-semibold uppercase tracking-wider">
                   <th className="p-4">Title</th>
                   <th className="p-4">Type</th>
+                  <th className="p-4">Lang</th>
                   <th className="p-4">Category</th>
                   <th className="p-4">Subcategory</th>
                   <th className="p-4">Company</th>
@@ -392,7 +414,7 @@ export default function MaterialManager() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-gray-300">
-                {materials.map((mat) => (
+                {filteredMaterials.map((mat) => (
                   <tr key={mat._id} className="hover:bg-white/3 transition-colors">
                     <td className="p-4 font-bold text-white flex items-center space-x-3">
                       {mat.type === 'Reel' || mat.type === 'Video' ? (
@@ -417,6 +439,7 @@ export default function MaterialManager() {
                     <td className="p-4">
                       <span className="bg-white/5 px-2.5 py-0.5 border border-white/10 rounded-md font-semibold">{mat.type}</span>
                     </td>
+                    <td className="p-4 text-xs font-semibold text-gray-300">{mat.language || 'English'}</td>
                     <td className="p-4 text-gray-400">{mat.categoryId?.name || 'General'}</td>
                     <td className="p-4 text-gray-400">{mat.subcategoryId?.name || '-'}</td>
                     <td className="p-4 text-gray-400">{mat.companyName || '-'}</td>
@@ -448,14 +471,17 @@ export default function MaterialManager() {
                     </td>
                   </tr>
                 ))}
-                {materials.length === 0 && (
+                {filteredMaterials.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="p-8 text-center text-gray-500">No marketing materials uploaded yet.</td>
+                    <td colSpan="7" className="p-8 text-center text-gray-500">
+                      {materials.length === 0 ? "No marketing materials uploaded yet." : "No materials match your search."}
+                    </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 
@@ -536,6 +562,19 @@ export default function MaterialManager() {
                   <option value="PPT">PPT Presentation</option>
                   <option value="Video">Video Link</option>
                   <option value="Brochure">Brochure Link</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Language</label>
+                <select
+                  value={materialForm.language || 'English'}
+                  onChange={e => setMaterialForm({ ...materialForm, language: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [&>option]:bg-[#0b0f19]"
+                >
+                  <option value="English">English</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Both">Both (Hindi + English)</option>
                 </select>
               </div>
 

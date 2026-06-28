@@ -21,6 +21,11 @@ const MaterialSchema = new mongoose.Schema({
     enum: ['Banner', 'Reel', 'PDF', 'PPT', 'Video', 'Brochure'],
     required: [true, 'Please specify the material type']
   },
+  language: {
+    type: String,
+    enum: ['English', 'Hindi', 'Both'],
+    default: 'English'
+  },
   fileUrl: {
     type: String,
     required: [true, 'Please provide the file URL']

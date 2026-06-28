@@ -42,6 +42,7 @@ export default function RegisterPage() {
   // Step 4: Subscriptions
   const [plans, setPlans] = useState([]);
   const [processingPlanId, setProcessingPlanId] = useState(null);
+  const [selectedPlanForConfirmation, setSelectedPlanForConfirmation] = useState(null);
 
   // Fetch plans and load Razorpay script when Step 4 is reached
   useEffect(() => {
@@ -70,7 +71,12 @@ export default function RegisterPage() {
     }
   }, [user]);
 
-  const handleSubscription = async (plan) => {
+  const handleSubscriptionClick = (plan) => {
+    setSelectedPlanForConfirmation(plan);
+  };
+
+  const processSubscription = async (plan) => {
+    setSelectedPlanForConfirmation(null);
     setProcessingPlanId(plan._id);
     setError('');
     try {
@@ -597,9 +603,32 @@ export default function RegisterPage() {
                         ))}
                       </div>
 
+                      {(plan.allowedCategories.length > 0 || plan.allowedSubcategories.length > 0 || plan.allowedTrainingCategories?.length > 0) && (
+                        <div className="mb-4">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Access Unlocked:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {plan.allowedCategories.map(cat => (
+                              <span key={cat._id} className="text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-1 rounded-lg">
+                                {cat.name}
+                              </span>
+                            ))}
+                            {plan.allowedSubcategories.map(sub => (
+                              <span key={sub._id} className="text-[10px] font-bold bg-purple-50 text-purple-600 border border-purple-100 px-2 py-1 rounded-lg">
+                                {sub.name}
+                              </span>
+                            ))}
+                            {plan.allowedTrainingCategories?.map(train => (
+                              <span key={train._id} className="text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100 px-2 py-1 rounded-lg flex items-center gap-1">
+                                ▶ {train.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <button
                         type="button"
-                        onClick={() => handleSubscription(plan)}
+                        onClick={() => handleSubscriptionClick(plan)}
                         disabled={processingPlanId === plan._id || loading}
                         className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 cursor-pointer"
                       >
@@ -626,6 +655,43 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {selectedPlanForConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
+            <button 
+              onClick={() => setSelectedPlanForConfirmation(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              ✕
+            </button>
+            <h3 className="text-2xl font-black text-slate-900 mb-6 text-center">Confirm Subscription</h3>
+            
+            <div className="space-y-4 mb-8">
+              <div className="flex justify-between text-slate-600 font-medium">
+                <span>Plan Price:</span>
+                <span>₹{selectedPlanForConfirmation.price}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 font-medium pb-4 border-b border-slate-100">
+                <span>GST (18%):</span>
+                <span>₹{Math.round(selectedPlanForConfirmation.price * 0.18)}</span>
+              </div>
+              <div className="flex justify-between text-xl font-black text-slate-900">
+                <span>Total Amount:</span>
+                <span>₹{Math.round(selectedPlanForConfirmation.price * 1.18)}</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => processSubscription(selectedPlanForConfirmation)}
+              className="w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300"
+            >
+              Proceed to Autopay
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
