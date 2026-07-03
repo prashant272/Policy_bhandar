@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import API from '../../services/api';
 import { LayoutGrid, Upload, Edit, Trash2, X, Plus, Image, ShieldAlert, Sparkles, FileText, FileCheck } from 'lucide-react';
 
@@ -130,6 +130,11 @@ export default function MaterialManager() {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   // Edit / Form States
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -148,6 +153,65 @@ export default function MaterialManager() {
     watermarkTemplateId: ''
   });
 
+  // Fetch materials with pagination
+  const fetchMaterials = async (pageNum = 1, query = searchQuery) => {
+    try {
+      if (pageNum === 1) setLoading(true);
+      else setLoadingMore(true);
+
+      const matRes = await API.get(`/admin/materials?page=${pageNum}&limit=20&search=${encodeURIComponent(query)}`);
+      if (matRes.data.success) {
+        if (pageNum === 1) {
+          setMaterials(matRes.data.data);
+        } else {
+          setMaterials(prev => {
+            const existingIds = new Set(prev.map(m => m._id));
+            const newMaterials = matRes.data.data.filter(m => !existingIds.has(m._id));
+            return [...prev, ...newMaterials];
+          });
+        }
+        setHasMore(matRes.data.pagination?.hasMore ?? false);
+      }
+    } catch (err) {
+      console.error('Error fetching materials:', err);
+    } finally {
+      if (pageNum === 1) setLoading(false);
+      else setLoadingMore(false);
+    }
+  };
+
+  const isFirstMount = useRef(true);
+
+  // Debounced Search Fetch
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    const delayDebounceFn = setTimeout(() => {
+      setPage(1);
+      fetchMaterials(1, searchQuery);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const observer = useRef();
+  const lastMaterialElementRef = useCallback(node => {
+    if (loading || loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prevPage => {
+          const nextPage = prevPage + 1;
+          fetchMaterials(nextPage, searchQuery);
+          return nextPage;
+        });
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, loadingMore, hasMore, searchQuery]);
+
   // Fetch basic datasets
   const fetchData = async () => {
     try {
@@ -161,10 +225,8 @@ export default function MaterialManager() {
       }
 
       // Fetch materials
-      const matRes = await API.get('/admin/materials');
-      if (matRes.data.success) {
-        setMaterials(matRes.data.data);
-      }
+      await fetchMaterials(1);
+      setPage(1);
 
       // Fetch global tags
       const tagRes = await API.get('/materials/tags');
@@ -317,11 +379,7 @@ export default function MaterialManager() {
   const subcategoryTree = buildSubcategoryTree(subcategories);
   const orderedSubcategories = flattenSubcategoryTree(subcategoryTree);
 
-  const filteredMaterials = materials.filter(mat => 
-    mat.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mat.companyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mat.type?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
 
   return (
     <div className="space-y-6">
@@ -414,8 +472,10 @@ export default function MaterialManager() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-gray-300">
-                {filteredMaterials.map((mat) => (
-                  <tr key={mat._id} className="hover:bg-white/3 transition-colors">
+                {materials.map((mat, index) => {
+                  const isLastItem = index === materials.length - 1;
+                  return (
+                  <tr key={mat._id} ref={isLastItem ? lastMaterialElementRef : null} className="hover:bg-white/3 transition-colors">
                     <td className="p-4 font-bold text-white flex items-center space-x-3">
                       {mat.type === 'Reel' || mat.type === 'Video' ? (
                         <video src={mat.fileUrl} muted preload="none" className="w-10 h-6 object-cover rounded border border-white/10" />
@@ -470,11 +530,19 @@ export default function MaterialManager() {
                       </button>
                     </td>
                   </tr>
-                ))}
-                {filteredMaterials.length === 0 && (
+                  );
+                })}
+                {materials.length === 0 && (
                   <tr>
                     <td colSpan="7" className="p-8 text-center text-gray-500">
                       {materials.length === 0 ? "No marketing materials uploaded yet." : "No materials match your search."}
+                    </td>
+                  </tr>
+                )}
+                {loadingMore && (
+                  <tr>
+                    <td colSpan="8" className="p-4 text-center">
+                      <div className="inline-block w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                     </td>
                   </tr>
                 )}

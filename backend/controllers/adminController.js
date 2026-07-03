@@ -174,12 +174,40 @@ exports.updateUser = async (req, res) => {
 // @access  Private (SuperAdmin, SubAdmin)
 exports.getMaterials = async (req, res) => {
   try {
-    const materials = await Material.find()
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const startIndex = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    const query = {};
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { companyName: { $regex: search, $options: 'i' } },
+        { type: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const total = await Material.countDocuments(query);
+
+    const materials = await Material.find(query)
       .populate('categoryId', 'name')
       .populate('subcategoryId', 'name')
       .populate('watermarkTemplateId')
-      .sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: materials });
+      .sort({ createdAt: -1, _id: -1 })
+      .skip(startIndex)
+      .limit(limit);
+
+    res.status(200).json({
+      success: true,
+      data: materials,
+      pagination: {
+        page,
+        limit,
+        total,
+        hasMore: startIndex + materials.length < total
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
