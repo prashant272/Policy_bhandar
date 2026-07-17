@@ -8,11 +8,13 @@ const {
   downloadMaterial,
   downloadDirect,
   downloadProxy,
-  getDownloadJobStatus
+  getDownloadJobStatus,
+  getAllSubcategories
 } = require('../controllers/materialController');
 const { protect } = require('../middlewares/auth');
 
 router.get('/categories', getCategories);
+router.get('/subcategories', getAllSubcategories);
 router.get('/categories/:categoryId/subcategories', getSubcategories);
 router.get('/tags', getTags);
 router.get('/download-job/:jobId', getDownloadJobStatus);

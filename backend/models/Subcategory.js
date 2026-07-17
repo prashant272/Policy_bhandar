@@ -19,6 +19,18 @@ const SubcategorySchema = new mongoose.Schema({
   isClickable: {
     type: Boolean,
     default: true
+  },
+  isMainSubcategory: {
+    type: Boolean,
+    default: false
+  },
+  addonPrice: {
+    type: Number,
+    default: 1499
+  },
+  isLeaderCategory: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

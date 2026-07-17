@@ -14,6 +14,14 @@ const CategorySchema = new mongoose.Schema({
   isClickable: {
     type: Boolean,
     default: true
+  },
+  addonPrice: {
+    type: Number,
+    default: 1499
+  },
+  isLeaderCategory: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

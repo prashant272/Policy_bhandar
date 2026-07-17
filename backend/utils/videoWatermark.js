@@ -28,9 +28,10 @@ try {
  * @param {string} outputPath - The destination file path for the watermarked video.
  * @param {string} resolution - Selected quality resolution ('1080', '720', '480').
  * @param {object} template - Optional template configuration from database.
+ * @param {string} watermarkType - Watermark Type (digicard, whatsapp, link)
  * @param {function} onProgress - Optional callback to report processing percentage.
  */
-const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, template, onProgress) => {
+const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, template, watermarkType = 'digicard', onProgress) => {
   let videoPath = videoUrlOrPath;
   let isTempVideo = false;
   
@@ -108,7 +109,7 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
   }
 
   // Define default template configuration
-  const config = template || {
+  let config = template || {
     layoutType: 'bottom-bar',
     backgroundColor: 'rgba(15, 23, 42, 0.8)',
     textColor: '#ffffff',
@@ -122,6 +123,17 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
     imageScale: 100,
     appendMode: false
   };
+
+  if (watermarkType === 'whatsapp' || watermarkType === 'link') {
+    config = {
+      ...config,
+      layoutType: watermarkType === 'whatsapp' ? 'qr-append-bottom' : 'link-append-bottom',
+      appendMode: true,
+      backgroundColor: '#ffffff',
+      textColor: '#0f172a',
+      borderColor: '#e2e8f0'
+    };
+  }
 
   const escapeXml = (unsafe) => {
     if (!unsafe) return '';
@@ -168,6 +180,34 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
     }
   }
 
+  // Convert QR Scanner photo to base64 if it exists
+  let qrScannerBase64 = '';
+  const isQR = config.layoutType === 'qr-append-bottom' || config.layoutType === 'link-append-bottom';
+  const qrUrl = agent.whatsappScannerImage || agent.profilePhoto;
+  if (isQR && qrUrl) {
+    try {
+      if (qrUrl.startsWith('http')) {
+        const axios = require('axios');
+        const response = await axios.get(qrUrl, { responseType: 'arraybuffer' });
+        const photoBuffer = Buffer.from(response.data);
+        const mimeType = response.headers['content-type'] || 'image/jpeg';
+        qrScannerBase64 = `data:${mimeType};base64,${photoBuffer.toString('base64')}`;
+      } else {
+        let photoPath = qrUrl.startsWith('/uploads')
+          ? path.join(__dirname, '../..', qrUrl)
+          : qrUrl;
+        
+        if (fs.existsSync(photoPath)) {
+          const photoBuffer = fs.readFileSync(photoPath);
+          const mimeType = qrUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+          qrScannerBase64 = `data:${mimeType};base64,${photoBuffer.toString('base64')}`;
+        }
+      }
+    } catch (photoErr) {
+      console.error('Failed to read QR scanner photo for watermark:', photoErr);
+    }
+  }
+
   // Convert logo to base64 if it exists
   let logoBase64 = '';
   if (config.logoUrl) {
@@ -204,6 +244,9 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
   let cardHeight;
   if (isProf) {
     cardHeight = Math.max(120, Math.round(videoHeight * 0.16 * sizeScale));
+  } else if (isQR) {
+    // For video, we use a flattened bottom bar for QR layout
+    cardHeight = Math.max(160, Math.round(videoHeight * 0.20 * sizeScale));
   } else {
     cardHeight = Math.max(90, Math.round(videoHeight * 0.11 * sizeScale));
   }
@@ -211,7 +254,7 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
   cardHeight = Math.round(cardHeight / 2) * 2;
 
   let cardWidth, cardX, cardY;
-  if (isProf) {
+  if (isProf || isQR) {
     cardWidth = videoWidth;
     cardX = 0;
     cardY = config.appendMode ? videoHeight : (videoHeight - cardHeight);
@@ -246,7 +289,45 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
   let logoElement = '';
   let photoElement = '';
 
-  if (isProf) {
+  if (isQR) {
+    // New Left-Right flattened layout for Video QR
+    const padding = Math.round(videoWidth * 0.04);
+    const qrHeight = Math.round(cardHeight * 0.85);
+    const qrWidth = Math.round(videoWidth * 0.35); // Allow enough width for tall digicards
+    
+    const qrX = padding;
+    const qrY = cardY + (cardHeight - qrHeight) / 2;
+
+    if (qrScannerBase64) {
+      photoElement += `
+        <image x="${qrX}" y="${qrY}" width="${qrWidth}" height="${qrHeight}" href="${qrScannerBase64}" preserveAspectRatio="xMidYMid meet" />
+      `;
+    } else {
+      photoElement += `
+        <rect x="${qrX}" y="${qrY}" width="${qrWidth}" height="${qrHeight}" fill="#f1f5f9" />
+        <text x="${qrX + qrWidth / 2}" y="${qrY + qrHeight / 2}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.15)}" font-weight="bold" fill="#94a3b8" text-anchor="middle" dominant-baseline="central">NO QR</text>
+      `;
+    }
+
+    // Right Side Text
+    const textStartX = qrX + qrWidth + padding * 1.5;
+    const textStartY = cardY + cardHeight / 2;
+
+    const nameText = (agent.name || '').toUpperCase();
+    const phoneText = agent.mobile ? `📞 ${agent.mobile}` : '';
+    
+    if (nameText) {
+       photoElement += `
+         <text x="${textStartX}" y="${textStartY - Math.round(cardHeight * 0.15)}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.25)}" font-weight="bold" fill="#0f172a" text-anchor="start" dominant-baseline="middle">${nameText}</text>
+       `;
+    }
+    
+    if (phoneText) {
+       photoElement += `
+         <text x="${textStartX}" y="${textStartY + Math.round(cardHeight * 0.15)}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${Math.round(cardHeight * 0.22)}" font-weight="bold" fill="#334155" text-anchor="start" dominant-baseline="middle">${phoneText}</text>
+       `;
+    }
+  } else if (isProf) {
     const boxSize = Math.round(cardHeight * 0.75 * imgScale);
     const boxX = currentX;
     const boxY = centerY - boxSize / 2;
@@ -316,12 +397,14 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
   const nameY = centerY - Math.round(cardHeight * 0.13);
   const detailsY = centerY + Math.round(cardHeight * 0.15);
 
-  const isBox = !config.layoutType.includes('bar') && !isProf;
+  const isBox = !config.layoutType.includes('bar') && !isProf && !isQR;
 
   let textElements = '';
   let contactElements = '';
 
-  if (isProf) {
+  if (isQR) {
+    // text and layout already handled inside logoElement and photoElement
+  } else if (isProf) {
     const boxSize = Math.round(cardHeight * 0.75);
     const boxY = centerY - boxSize / 2;
     let startY = boxY;
@@ -365,7 +448,7 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
       startY += boxLineHeight;
     }
     textElements += `<text x="${currentX}" y="${startY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${detailFontSize}" font-weight="500" fill="${config.textColor || '#ffffff'}" opacity="0.8" filter="url(#shadow)" dominant-baseline="middle">${email}</text>`;
-  } else {
+  } else if (!isQR) {
     // Bar layouts
     if (config.showUserName) {
       textElements += `<text x="${currentX}" y="${nameY}" font-family="'Plus Jakarta Sans', 'DejaVu Sans', 'Noto Sans', Arial, sans-serif" font-size="${nameFontSize}" font-weight="bold" fill="${config.textColor || '#ffffff'}" filter="url(#shadow)" dominant-baseline="middle">${name}</text>`;
@@ -394,7 +477,7 @@ const watermarkVideo = async (videoUrlOrPath, agent, outputPath, resolution, tem
       </defs>
 
       <!-- Watermark Container Card -->
-      <rect x="${cardX}" y="${cardY}" width="${cardWidth}" height="${cardHeight}" rx="${isProf ? 0 : Math.round(cardHeight * 0.12)}" ry="${isProf ? 0 : Math.round(cardHeight * 0.12)}" fill="${config.backgroundColor || 'rgba(15, 23, 42, 0.8)'}" stroke="${config.borderColor || 'rgba(99, 102, 241, 0.3)'}" stroke-width="${Math.max(1.5, Math.round(videoHeight * 0.002))}" />
+      <rect x="${cardX}" y="${cardY}" width="${cardWidth}" height="${cardHeight}" rx="${(isProf || isQR) ? 0 : Math.round(cardHeight * 0.12)}" ry="${(isProf || isQR) ? 0 : Math.round(cardHeight * 0.12)}" fill="${config.backgroundColor || 'rgba(15, 23, 42, 0.8)'}" stroke="${config.borderColor || 'rgba(99, 102, 241, 0.3)'}" stroke-width="${Math.max(1.5, Math.round(videoHeight * 0.002))}" />
       
       <!-- Accent Top Border for Professional Layout -->
       ${isProf ? `<line x1="${cardX}" y1="${cardY}" x2="${cardX + cardWidth}" y2="${cardY}" stroke="${config.accentColor || '#f97316'}" stroke-width="${Math.max(3, Math.round(videoHeight * 0.004))}" />` : ''}

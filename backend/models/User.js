@@ -60,6 +60,14 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  whatsappScannerImage: {
+    type: String,
+    default: ''
+  },
+  customLink: {
+    type: String,
+    default: ''
+  },
   isVerified: {
     type: Boolean,
     default: false
@@ -79,6 +87,18 @@ const UserSchema = new mongoose.Schema({
   selectedSubcategoryId: {
     type: mongoose.Schema.ObjectId,
     ref: 'Subcategory'
+  },
+  unlockedCategories: [{
+    type: mongoose.Schema.ObjectId,
+    ref: 'Category'
+  }],
+  purchasedAddons: [{
+    type: mongoose.Schema.ObjectId,
+    ref: 'Category'
+  }],
+  hasLeaderAccess: {
+    type: Boolean,
+    default: false
   },
   subscriptionType: {
     type: String,

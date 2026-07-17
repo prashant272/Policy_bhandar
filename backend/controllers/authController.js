@@ -140,9 +140,15 @@ exports.completeProfile = async (req, res) => {
     user.designation = designation || user.designation;
 
     // Handle optional profile photo upload
-    if (req.file) {
-      const fileUrl = await uploadFile(req.file, 'profiles');
+    if (req.files && req.files.profilePhoto && req.files.profilePhoto[0]) {
+      const fileUrl = await uploadFile(req.files.profilePhoto[0], 'profiles');
       user.profilePhoto = fileUrl;
+    }
+    
+    // Handle optional whatsapp scanner photo upload
+    if (req.files && req.files.whatsappScannerPhoto && req.files.whatsappScannerPhoto[0]) {
+      const fileUrl = await uploadFile(req.files.whatsappScannerPhoto[0], 'profiles');
+      user.whatsappScannerImage = fileUrl;
     }
 
     await user.save();
@@ -243,18 +249,25 @@ exports.updateProfile = async (req, res) => {
   try {
     const { 
       name, mobile, email, company, occupationType, designation, 
-      state, city, selectedCategoryId, selectedSubcategoryId, profilePhotoUrl 
+      state, city, selectedCategoryId, selectedSubcategoryId, profilePhotoUrl,
+      whatsappScannerImageUrl, customLink 
     } = req.body;
     
     const updateData = { 
       name, mobile, email, company, occupationType, designation, 
-      state, city,
+      state, city, customLink,
       selectedCategoryId: selectedCategoryId === '' ? null : selectedCategoryId,
       selectedSubcategoryId: selectedSubcategoryId === '' ? null : selectedSubcategoryId
     };
 
-    if (req.file) {
-      updateData.profilePhoto = await uploadFile(req.file);
+    if (req.files && req.files.whatsappScannerPhoto && req.files.whatsappScannerPhoto[0]) {
+      updateData.whatsappScannerImage = await uploadFile(req.files.whatsappScannerPhoto[0]);
+    } else if (whatsappScannerImageUrl !== undefined) {
+      updateData.whatsappScannerImage = whatsappScannerImageUrl;
+    }
+
+    if (req.files && req.files.profilePhoto && req.files.profilePhoto[0]) {
+      updateData.profilePhoto = await uploadFile(req.files.profilePhoto[0]);
     } else if (profilePhotoUrl !== undefined) {
       updateData.profilePhoto = profilePhotoUrl;
     }
@@ -270,5 +283,80 @@ exports.updateProfile = async (req, res) => {
       success: false,
       error: err.message
     });
+  }
+};
+
+// @desc    Forgot Password step 1: Send OTP
+// @route   POST /api/auth/forgot-password-init
+// @access  Public
+exports.forgotPasswordInit = async (req, res) => {
+  try {
+    const { identifier } = req.body; // email or mobile
+
+    if (!identifier) {
+      return res.status(400).json({ success: false, error: 'Please provide email or mobile' });
+    }
+
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { mobile: identifier }]
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    sendEmailOTP(user.email, user.name, otp);
+    sendWhatsAppOTP(user.mobile, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent to your registered email and WhatsApp',
+      userId: user._id
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Forgot Password step 2: Verify OTP and reset password
+// @route   POST /api/auth/forgot-password-verify
+// @access  Public
+exports.forgotPasswordVerify = async (req, res) => {
+  try {
+    const { userId, otp, newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid new password (min 6 characters)' });
+    }
+
+    const user = await User.findById(userId).select('+otp +otpExpires');
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (!user.otp || user.otp !== otp) {
+      return res.status(400).json({ success: false, error: 'Invalid OTP' });
+    }
+
+    if (Date.now() > user.otpExpires) {
+      return res.status(400).json({ success: false, error: 'OTP has expired' });
+    }
+
+    // Update password (will be hashed automatically)
+    user.password = newPassword;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Password has been reset successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 };

@@ -14,7 +14,7 @@ const razorpay = new Razorpay({
 // @access  Private
 exports.createOrder = async (req, res) => {
   try {
-    const { planId } = req.body;
+    const { planId, selectedAddons } = req.body;
     
     if (!planId) {
       return res.status(400).json({ success: false, error: 'Plan ID is required' });
@@ -25,7 +25,19 @@ exports.createOrder = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Plan not found' });
     }
 
-    const finalPrice = Math.round(plan.price * 1.18);
+    let basePrice = plan.price;
+    let addonsPrice = 0;
+
+    // Calculate addon prices if any
+    if (selectedAddons && Array.isArray(selectedAddons) && selectedAddons.length > 0) {
+      const Category = require('../models/Category');
+      const addons = await Category.find({ _id: { $in: selectedAddons } });
+      addons.forEach(addon => {
+        addonsPrice += addon.addonPrice || 1499;
+      });
+    }
+
+    const finalPrice = Math.round((basePrice + addonsPrice) * 1.18);
 
     // Amount should be in paise
     const options = {
@@ -53,7 +65,7 @@ exports.createOrder = async (req, res) => {
 // @access  Private
 exports.verifyPayment = async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId, selectedCategories, selectedAddons } = req.body;
 
     const secret = process.env.RAZORPAY_KEY_SECRET || 'dummysecret123';
 
@@ -76,6 +88,24 @@ exports.verifyPayment = async (req, res) => {
     user.activePlan = planDoc._id;
     user.subscriptionType = planDoc.name;
     
+    if (planDoc.isLeaderIncluded) {
+      user.hasLeaderAccess = true;
+    }
+
+    if (selectedCategories && Array.isArray(selectedCategories)) {
+      user.unlockedCategories = selectedCategories;
+    }
+    
+    if (selectedAddons && Array.isArray(selectedAddons)) {
+      // Append new addons to existing ones, avoid duplicates
+      const currentAddons = user.purchasedAddons ? user.purchasedAddons.map(id => id.toString()) : [];
+      selectedAddons.forEach(id => {
+        if (!currentAddons.includes(id)) {
+           user.purchasedAddons.push(id);
+        }
+      });
+    }
+    
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + (planDoc.validityDays || 30));
     user.planExpiryDate = expiry;
@@ -94,7 +124,7 @@ exports.verifyPayment = async (req, res) => {
 // @access  Private
 exports.createSubscription = async (req, res) => {
   try {
-    const { planId } = req.body;
+    const { planId, selectedAddons } = req.body;
     
     if (!planId) {
       return res.status(400).json({ success: false, error: 'Plan ID is required' });
@@ -105,42 +135,71 @@ exports.createSubscription = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Plan not found' });
     }
 
-    // Ensure a Razorpay Plan exists for this pricing plan
-    if (!plan.razorpayPlanId) {
-      let period = 'monthly';
-      let interval = 1;
-      
-      if (plan.validityDays >= 360) {
-        period = 'yearly';
-        interval = 1;
-      } else if (plan.validityDays >= 90) {
-        period = 'monthly';
-        interval = 3;
-      } else {
-        period = 'monthly';
-        interval = 1;
+    // Calculate total including addons
+    let addonsTotal = 0;
+    if (selectedAddons && selectedAddons.length > 0) {
+      // Import Subcategory at top of file (or use mongoose model) if not imported, 
+      // but assuming Subcategory is required. Let's just require it here if needed.
+      const Subcategory = require('../models/Subcategory');
+      for (const id of selectedAddons) {
+        const subcat = await Subcategory.findById(id);
+        if (subcat) addonsTotal += (subcat.addonPrice || 1499);
       }
+    }
+    
+    const finalPrice = plan.price + addonsTotal;
+    let finalRzpPlanId;
 
+    let period = 'monthly';
+    let interval = 1;
+    if (plan.validityDays >= 360) {
+      period = 'yearly';
+      interval = 1;
+    } else if (plan.validityDays >= 90) {
+      period = 'monthly';
+      interval = 3;
+    } else {
+      period = 'monthly';
+      interval = 1;
+    }
+
+    if (addonsTotal > 0) {
+      // Create a dynamic plan on the fly if there are addons
       const rzpPlan = await razorpay.plans.create({
         period: period,
         interval: interval,
         item: {
-          name: plan.name,
-          amount: Math.round(plan.price * 1.18) * 100, // Amount in paise with 18% GST
+          name: `${plan.name} + Addons`,
+          amount: Math.round(finalPrice * 1.18) * 100, // Amount in paise with 18% GST
           currency: 'INR',
-          description: `${plan.name} Subscription`
+          description: `Subscription with dynamic addons`
         }
       });
-
-      plan.razorpayPlanId = rzpPlan.id;
-      await plan.save();
+      finalRzpPlanId = rzpPlan.id;
+    } else {
+      // Ensure a base Razorpay Plan exists for this pricing plan
+      if (!plan.razorpayPlanId) {
+        const rzpPlan = await razorpay.plans.create({
+          period: period,
+          interval: interval,
+          item: {
+            name: plan.name,
+            amount: Math.round(plan.price * 1.18) * 100,
+            currency: 'INR',
+            description: `${plan.name} Subscription`
+          }
+        });
+        plan.razorpayPlanId = rzpPlan.id;
+        await plan.save();
+      }
+      finalRzpPlanId = plan.razorpayPlanId;
     }
 
     // Create Razorpay Subscription with 15-day trial (start_at in 15 days)
     const startAt = Math.floor((Date.now() + 15 * 24 * 60 * 60 * 1000) / 1000);
 
     const subscriptionOptions = {
-      plan_id: plan.razorpayPlanId,
+      plan_id: finalRzpPlanId,
       customer_notify: 1,
       total_count: plan.validityDays >= 360 ? 5 : 60, 
       start_at: startAt,
@@ -169,7 +228,7 @@ exports.createSubscription = async (req, res) => {
 // @access  Private
 exports.verifySubscription = async (req, res) => {
   try {
-    const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature, planId } = req.body;
+    const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature, planId, selectedCategories, selectedAddons } = req.body;
     const secret = process.env.RAZORPAY_KEY_SECRET || 'dummysecret123';
 
     // Verify signature
@@ -195,6 +254,23 @@ exports.verifySubscription = async (req, res) => {
     user.subscriptionType = planDoc.name;
     user.razorpaySubscriptionId = razorpay_subscription_id;
     user.subscriptionStatus = 'active';
+
+    if (planDoc.isLeaderIncluded) {
+      user.hasLeaderAccess = true;
+    }
+
+    if (selectedCategories && Array.isArray(selectedCategories)) {
+      user.unlockedCategories = selectedCategories;
+    }
+    
+    if (selectedAddons && Array.isArray(selectedAddons)) {
+      const currentAddons = user.purchasedAddons ? user.purchasedAddons.map(id => id.toString()) : [];
+      selectedAddons.forEach(id => {
+        if (!currentAddons.includes(id)) {
+           user.purchasedAddons.push(id);
+        }
+      });
+    }
 
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + 15 + (planDoc.validityDays || 30));

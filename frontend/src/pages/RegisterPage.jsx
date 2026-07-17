@@ -67,9 +67,9 @@ export default function RegisterPage() {
   // Set step to 4 if logged-in user doesn't have activePlan (e.g. on page refresh or direct access)
   useEffect(() => {
     if (user && !user.activePlan && user.role !== 'SuperAdmin' && user.role !== 'SubAdmin') {
-      setStep(4);
+      navigate('/pricing');
     }
-  }, [user]);
+  }, [user, navigate]);
 
   const handleSubscriptionClick = (plan) => {
     setSelectedPlanForConfirmation(plan);

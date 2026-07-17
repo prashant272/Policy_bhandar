@@ -9,13 +9,19 @@ const { uploadFile } = require('../config/r2');
 // @access  Private (SuperAdmin, SubAdmin)
 exports.createCategory = async (req, res) => {
   try {
-    const { name, icon, isClickable } = req.body;
+    const { name, icon, isClickable, isLeaderCategory, addonPrice } = req.body;
 
     if (!name) {
       return res.status(400).json({ success: false, error: 'Please provide category name' });
     }
 
-    const category = await Category.create({ name, icon, isClickable });
+    const category = await Category.create({ 
+      name, 
+      icon, 
+      isClickable,
+      isLeaderCategory,
+      addonPrice
+    });
     res.status(201).json({ success: true, data: category });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -27,7 +33,7 @@ exports.createCategory = async (req, res) => {
 // @access  Private (SuperAdmin, SubAdmin)
 exports.createSubcategory = async (req, res) => {
   try {
-    const { categoryId, parentSubcategoryId, name, isClickable } = req.body;
+    const { categoryId, parentSubcategoryId, name, isClickable, isMainSubcategory, isLeaderCategory, addonPrice } = req.body;
 
     if (!categoryId || !name) {
       return res.status(400).json({ success: false, error: 'Please provide categoryId and subcategory name' });
@@ -37,7 +43,10 @@ exports.createSubcategory = async (req, res) => {
       categoryId,
       parentSubcategoryId: parentSubcategoryId || null,
       name,
-      isClickable
+      isClickable,
+      isMainSubcategory,
+      isLeaderCategory,
+      addonPrice
     });
     res.status(201).json({ success: true, data: subcategory });
   } catch (err) {
@@ -132,7 +141,7 @@ exports.getUsers = async (req, res) => {
 // @access  Private (SuperAdmin)
 exports.updateUser = async (req, res) => {
   try {
-    const { role, subscriptionType, activePlan } = req.body;
+    const { role, subscriptionType, activePlan, name, email, mobile, password } = req.body;
     
     const user = await User.findById(req.params.id);
     if (!user) {
@@ -141,6 +150,10 @@ exports.updateUser = async (req, res) => {
 
     if (role) user.role = role;
     if (subscriptionType) user.subscriptionType = subscriptionType;
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (mobile) user.mobile = mobile;
+    if (password) user.password = password;
 
     if (activePlan !== undefined) {
       if (activePlan === null || activePlan === '') {
@@ -164,6 +177,23 @@ exports.updateUser = async (req, res) => {
     await user.save();
 
     res.status(200).json({ success: true, data: user });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Delete User
+// @route   DELETE /api/admin/users/:id
+// @access  Private (SuperAdmin)
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: 'User deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -394,7 +424,7 @@ exports.deleteSubcategory = async (req, res) => {
 // @access  Private (SuperAdmin, SubAdmin)
 exports.updateCategory = async (req, res) => {
   try {
-    const { name, icon, isClickable } = req.body;
+    const { name, icon, isClickable, isLeaderCategory, addonPrice } = req.body;
     const category = await Category.findById(req.params.id);
     if (!category) {
       return res.status(404).json({ success: false, error: 'Category not found' });
@@ -403,6 +433,8 @@ exports.updateCategory = async (req, res) => {
     if (name) category.name = name;
     if (icon !== undefined) category.icon = icon;
     if (isClickable !== undefined) category.isClickable = isClickable;
+    if (isLeaderCategory !== undefined) category.isLeaderCategory = isLeaderCategory;
+    if (addonPrice !== undefined) category.addonPrice = addonPrice;
 
     await category.save();
     res.status(200).json({ success: true, data: category });
@@ -416,7 +448,7 @@ exports.updateCategory = async (req, res) => {
 // @access  Private (SuperAdmin, SubAdmin)
 exports.updateSubcategory = async (req, res) => {
   try {
-    const { name, parentSubcategoryId, isClickable } = req.body;
+    const { name, parentSubcategoryId, isClickable, isMainSubcategory, isLeaderCategory, addonPrice } = req.body;
     const subcategory = await Subcategory.findById(req.params.id);
     if (!subcategory) {
       return res.status(404).json({ success: false, error: 'Subcategory not found' });
@@ -429,6 +461,9 @@ exports.updateSubcategory = async (req, res) => {
     }
     
     if (isClickable !== undefined) subcategory.isClickable = isClickable;
+    if (isMainSubcategory !== undefined) subcategory.isMainSubcategory = isMainSubcategory;
+    if (isLeaderCategory !== undefined) subcategory.isLeaderCategory = isLeaderCategory;
+    if (addonPrice !== undefined) subcategory.addonPrice = addonPrice;
 
     await subcategory.save();
     res.status(200).json({ success: true, data: subcategory });

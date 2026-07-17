@@ -46,6 +46,24 @@ exports.getSubcategories = async (req, res) => {
   }
 };
 
+// @desc    Get all subcategories (all categories)
+// @route   GET /api/materials/subcategories
+// @access  Public
+exports.getAllSubcategories = async (req, res) => {
+  try {
+    const subcategories = await Subcategory.find();
+    res.status(200).json({
+      success: true,
+      data: subcategories
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+};
+
 // @desc    Get all materials with filters (pagination, category, subcategory, type, company, search)
 // @route   GET /api/materials
 // @access  Public
@@ -197,25 +215,46 @@ exports.downloadMaterial = async (req, res) => {
       if (user.activePlan) {
         limit = user.activePlan.dailyDownloadLimit;
 
-        // Plan Access Check
+        // Access Check
         const matCatId = material.categoryId?.toString();
         const matSubCatId = material.subcategoryId?.toString();
+        
+        let isLeaderContent = false;
+        
+        if (matCatId) {
+          const category = await Category.findById(matCatId);
+          if (category && category.isLeaderCategory) isLeaderContent = true;
+        }
+        
+        if (matSubCatId && !isLeaderContent) {
+          const subcategory = await Subcategory.findById(matSubCatId);
+          if (subcategory && subcategory.isLeaderCategory) isLeaderContent = true;
+        }
 
-        const allowedCats = user.activePlan.allowedCategories?.map(c => c.toString()) || [];
-        const allowedSubCats = user.activePlan.allowedSubcategories?.map(c => c.toString()) || [];
+        // If it's a Leader category, check leader access
+        if (isLeaderContent && !user.hasLeaderAccess) {
+          return res.status(403).json({
+            success: false,
+            limitReached: true,
+            needsUpgrade: true,
+            error: 'Premium Content: This is Leader Segment content. Please upgrade to a Leader plan!'
+          });
+        }
 
-        // If the plan has defined category restrictions
-        if (allowedCats.length > 0 || allowedSubCats.length > 0) {
-          const hasCatAccess = allowedCats.includes(matCatId);
-          const hasSubCatAccess = allowedSubCats.includes(matSubCatId);
-
-          if (!hasCatAccess && !hasSubCatAccess) {
-             return res.status(403).json({
-               success: false,
-               limitReached: true,
-               needsUpgrade: true,
-               error: 'Premium Content: Your current plan does not include access to this category. Please upgrade your plan!'
-             });
+        // If it's not exclusively Leader content, check if it's unlocked via plan or addons
+        if (!isLeaderContent) {
+          const unlockedCats = user.unlockedCategories?.map(c => c.toString()) || [];
+          const addonCats = user.purchasedAddons?.map(c => c.toString()) || [];
+          
+          const hasAccess = unlockedCats.includes(matCatId) || addonCats.includes(matCatId) || unlockedCats.includes(matSubCatId) || addonCats.includes(matSubCatId);
+          
+          if (!hasAccess && user.role !== 'SuperAdmin' && user.role !== 'SubAdmin') {
+            return res.status(403).json({
+              success: false,
+              limitReached: true,
+              needsUpgrade: true,
+              error: 'Premium Content: You have not unlocked this category/subcategory. Please purchase an add-on or upgrade your plan!'
+            });
           }
         }
       } else if (user.subscriptionType !== 'Free') {
@@ -249,7 +288,7 @@ exports.downloadMaterial = async (req, res) => {
     }
 
     console.log('Download req.body:', req.body);
-    const { resolution } = req.body || {};
+    const { resolution, watermarkType } = req.body || {};
     let finalFileUrl = material.fileUrl;
 
     if (material.type === 'Reel' || material.type === 'Video') {
@@ -277,8 +316,8 @@ exports.downloadMaterial = async (req, res) => {
             template = await WatermarkTemplate.findOne().sort({ createdAt: -1 });
           }
 
-          console.log(`Starting background watermarking for job ${jobId}, resolution: ${resolution}`);
-          await watermarkVideo(downloadUrl, user, outputPath, resolution, template, (percent) => {
+          console.log(`Starting background watermarking for job ${jobId}, resolution: ${resolution}, watermarkType: ${watermarkType}`);
+          await watermarkVideo(downloadUrl, user, outputPath, resolution, template, watermarkType, (percent) => {
             downloadJobs[jobId].progress = percent;
             console.log(`Job ${jobId} progress: ${percent}%`);
           });

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import API from '../../services/api';
-import { Users, X, Info } from 'lucide-react';
+import { Users, X, Info, Edit2, Trash2 } from 'lucide-react';
 
 export default function UsersManager() {
   const [usersList, setUsersList] = useState([]);
   const [plansList, setPlansList] = useState([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editFormData, setEditFormData] = useState({ name: '', mobile: '', email: '', password: '' });
 
   // Fetch users
   const fetchUsers = async () => {
@@ -53,6 +55,48 @@ export default function UsersManager() {
     }
   };
 
+  const handleEditClick = (user) => {
+    setEditingUser(user);
+    setEditFormData({
+      name: user.name || '',
+      mobile: user.mobile || '',
+      email: user.email || '',
+      password: '' // empty password by default unless changing
+    });
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    try {
+      const updateData = { ...editFormData };
+      if (!updateData.password) delete updateData.password;
+
+      const res = await API.put(`/admin/users/${editingUser._id}`, updateData);
+      if (res.data.success) {
+        setMessage('Success: User details updated successfully!');
+        setEditingUser(null);
+        fetchUsers();
+      }
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Failed to update user details');
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    setMessage('');
+    try {
+      const res = await API.delete(`/admin/users/${userId}`);
+      if (res.data.success) {
+        setMessage('Success: User deleted successfully!');
+        fetchUsers();
+      }
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Failed to delete user');
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -85,25 +129,26 @@ export default function UsersManager() {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-white/5 border-b border-white/10 text-gray-400 font-semibold uppercase tracking-wider">
-                <th className="p-4">Advisor Name</th>
-                <th className="p-4">Mobile</th>
-                <th className="p-4">Email</th>
-                <th className="p-4">Location</th>
-                <th className="p-4">System Role</th>
-                <th className="p-4">Subscription Plan</th>
-                <th className="p-4 text-center">Downloads Today</th>
+                <th className="p-4 whitespace-nowrap">Advisor Name</th>
+                <th className="p-4 whitespace-nowrap">Mobile</th>
+                <th className="p-4 whitespace-nowrap">Email</th>
+                <th className="p-4 whitespace-nowrap">Location</th>
+                <th className="p-4 whitespace-nowrap">System Role</th>
+                <th className="p-4 whitespace-nowrap">Subscription Plan</th>
+                <th className="p-4 text-center whitespace-nowrap">Downloads Today</th>
+                <th className="p-4 text-center whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-gray-300">
               {usersList.map((usr) => (
                 <tr key={usr._id} className="hover:bg-white/3 transition-colors">
-                  <td className="p-4 font-bold text-white">
+                  <td className="p-4 font-bold text-white whitespace-nowrap min-w-[200px]">
                     <div>{usr.name}</div>
                     <div className="text-[10px] text-gray-500 font-normal mt-0.5">{usr.agentType || 'Insurance Advisor'}</div>
                   </td>
-                  <td className="p-4 font-semibold text-gray-400">{usr.mobile}</td>
-                  <td className="p-4 text-gray-400">{usr.email}</td>
-                  <td className="p-4 text-gray-400">
+                  <td className="p-4 font-semibold text-gray-400 whitespace-nowrap">{usr.mobile}</td>
+                  <td className="p-4 text-gray-400 whitespace-nowrap">{usr.email}</td>
+                  <td className="p-4 text-gray-400 whitespace-nowrap">
                     {usr.city || usr.state ? `${usr.city || ''}, ${usr.state || ''}` : '-'}
                   </td>
                   <td className="p-4">
@@ -136,22 +181,93 @@ export default function UsersManager() {
                     </span>
                     <span className="text-gray-600 font-normal"> / 5</span>
                   </td>
+                  <td className="p-4 text-center">
+                    <div className="flex justify-center items-center space-x-2">
+                      <button onClick={() => handleEditClick(usr)} className="p-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 rounded transition-colors" title="Edit User">
+                        <Edit2 size={16} />
+                      </button>
+                      <button onClick={() => handleDeleteUser(usr._id)} className="p-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/40 rounded transition-colors" title="Delete User">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {usersList.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="7" className="p-8 text-center text-gray-500">No advisors registered in the database yet.</td>
+                  <td colSpan="8" className="p-8 text-center text-gray-500">No advisors registered in the database yet.</td>
                 </tr>
               )}
               {loading && (
                 <tr>
-                  <td colSpan="7" className="p-8 text-center text-indigo-400 font-semibold animate-pulse">Loading advisors dataset...</td>
+                  <td colSpan="8" className="p-8 text-center text-indigo-400 font-semibold animate-pulse">Loading advisors dataset...</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#0b1021] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="flex justify-between items-center p-4 border-b border-white/10 bg-white/5">
+              <h3 className="text-lg font-bold text-white">Edit User</h3>
+              <button onClick={() => setEditingUser(null)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Mobile</label>
+                <input
+                  type="text"
+                  value={editFormData.mobile}
+                  onChange={(e) => setEditFormData({...editFormData, mobile: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">New Password (leave empty to keep current)</label>
+                <input
+                  type="password"
+                  value={editFormData.password}
+                  onChange={(e) => setEditFormData({...editFormData, password: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div className="pt-2">
+                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl transition-colors">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

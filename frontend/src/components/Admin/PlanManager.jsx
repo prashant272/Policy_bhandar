@@ -16,11 +16,13 @@ export default function PlanManager() {
   const initialFormState = {
     name: '',
     price: '',
+    priceRenew: 0,
+    segment: 'Agent',
+    categoryCount: 1,
+    isLeaderIncluded: false,
     validityDays: 30,
     dailyDownloadLimit: 5,
     features: '',
-    allowedCategories: [],
-    allowedSubcategories: [],
     allowedTrainingCategories: [],
     isActive: true
   };
@@ -29,24 +31,12 @@ export default function PlanManager() {
 
   const fetchData = async () => {
     try {
-      const [plansRes, catsRes, trainingCatsRes] = await Promise.all([
+      const [plansRes, trainingCatsRes] = await Promise.all([
         API.get('/plans'),
-        API.get('/materials/categories'),
         API.get('/trainings/categories')
       ]);
       if (plansRes.data.success) setPlans(plansRes.data.data);
-      if (catsRes.data.success) setCategories(catsRes.data.data);
       if (trainingCatsRes.data.success) setTrainingCategories(trainingCatsRes.data.data);
-      
-      // Fetch subcategories for all categories to show in the list
-      const subcats = [];
-      for (const cat of catsRes.data.data) {
-        const subRes = await API.get(`/materials/categories/${cat._id}/subcategories`);
-        if (subRes.data.success) {
-          subcats.push(...subRes.data.data);
-        }
-      }
-      setSubcategories(subcats);
     } catch (err) {
       console.error('Error fetching data for plans:', err);
     }
@@ -106,9 +96,11 @@ export default function PlanManager() {
     setEditingId(plan._id);
     setForm({
       ...plan,
+      priceRenew: plan.priceRenew || 0,
+      segment: plan.segment || 'Agent',
+      categoryCount: plan.categoryCount || 1,
+      isLeaderIncluded: plan.isLeaderIncluded || false,
       features: plan.features.join(', '),
-      allowedCategories: plan.allowedCategories.map(c => typeof c === 'object' ? c._id : c),
-      allowedSubcategories: plan.allowedSubcategories.map(c => typeof c === 'object' ? c._id : c),
       allowedTrainingCategories: plan.allowedTrainingCategories ? plan.allowedTrainingCategories.map(c => typeof c === 'object' ? c._id : c) : []
     });
     // scroll to top
@@ -159,8 +151,30 @@ export default function PlanManager() {
               <input type="text" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-[#0b1021] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:border-indigo-500" placeholder="e.g. Premium Pro" />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Price (₹)</label>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">New Price (₹)</label>
               <input type="number" required value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="w-full bg-[#0b1021] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:border-indigo-500" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Renew Price (₹)</label>
+              <input type="number" value={form.priceRenew} onChange={e => setForm({...form, priceRenew: e.target.value})} className="w-full bg-[#0b1021] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:border-indigo-500" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Segment</label>
+              <select value={form.segment} onChange={e => setForm({...form, segment: e.target.value})} className="w-full bg-[#0b1021] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:border-indigo-500">
+                <option value="Agent">Agent</option>
+                <option value="Leader">Leader</option>
+                <option value="Combo">Leader + Agent Combo</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Category Count</label>
+              <input type="number" min="1" max="4" value={form.categoryCount} onChange={e => setForm({...form, categoryCount: e.target.value})} className="w-full bg-[#0b1021] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:border-indigo-500" />
+            </div>
+            <div className="flex items-center">
+              <label className="flex items-center gap-2 cursor-pointer mt-4">
+                <input type="checkbox" checked={form.isLeaderIncluded} onChange={e => setForm({...form, isLeaderIncluded: e.target.checked})} className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500" />
+                <span className="text-[12px] font-bold text-gray-300">Includes Leader Access</span>
+              </label>
             </div>
             <div>
               <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Clock size={12}/> Validity (Days)</label>
@@ -200,39 +214,8 @@ export default function PlanManager() {
           {/* Access Configuration */}
           <div className="border border-white/10 rounded-xl p-4 bg-slate-900/50">
             <h4 className="text-xs font-bold text-indigo-400 uppercase mb-3 flex items-center gap-2"><Tag size={14}/> Access Configuration</h4>
-            <p className="text-[10px] text-gray-500 mb-4">Select which categories and subcategories users on this plan can download from. If left empty, they might not have access to any premium content.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-80 overflow-y-auto custom-scrollbar pr-2">
-              {categories.map(cat => (
-                <div key={cat._id} className="space-y-2 bg-[#0b1021] p-3 rounded-lg border border-white/5">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={form.allowedCategories.includes(cat._id)}
-                      onChange={() => handleCheckboxChange('allowedCategories', cat._id)}
-                      className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500"
-                    />
-                    <span className="text-sm font-bold text-white">{cat.name} (Full Category Access)</span>
-                  </label>
-                  
-                  {/* Subcategories for this category */}
-                  <div className="pl-6 space-y-1.5 border-l-2 border-white/5 ml-2">
-                    {subcategories.filter(sub => sub.categoryId === cat._id).map(sub => (
-                      <label key={sub._id} className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={form.allowedSubcategories.includes(sub._id)}
-                          onChange={() => handleCheckboxChange('allowedSubcategories', sub._id)}
-                          className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
-                        />
-                        <span className="text-xs text-gray-300">{sub.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <h5 className="text-[10px] font-bold text-red-400 uppercase mt-6 mb-3">Training Module Access</h5>
+            <h5 className="text-[10px] font-bold text-red-400 uppercase mt-2 mb-3">Training Module Access</h5>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-48 overflow-y-auto custom-scrollbar pr-2">
               {trainingCategories.map(cat => (
                 <div key={cat._id} className="bg-[#0b1021] p-3 rounded-lg border border-white/5">

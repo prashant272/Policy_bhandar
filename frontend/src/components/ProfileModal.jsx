@@ -17,13 +17,18 @@ export default function ProfileModal({ isOpen, onClose }) {
     designation: user?.designation || '',
     selectedCategoryId: user?.selectedCategoryId || '',
     selectedSubcategoryId: user?.selectedSubcategoryId || '',
-    profilePhotoUrl: ''
+    profilePhotoUrl: '',
+    whatsappScannerImageUrl: user?.whatsappScannerImage || '',
+    customLink: user?.customLink || ''
   });
 
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(user?.profilePhoto ? (user.profilePhoto.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${user.profilePhoto}` : user.profilePhoto) : null);
+  
+  const [whatsappPhoto, setWhatsappPhoto] = useState(null);
+  const [whatsappPhotoPreview, setWhatsappPhotoPreview] = useState(user?.whatsappScannerImage ? (user.whatsappScannerImage.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${user.whatsappScannerImage}` : user.whatsappScannerImage) : null);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -66,10 +71,14 @@ export default function ProfileModal({ isOpen, onClose }) {
         designation: user.designation || '',
         selectedCategoryId: user.selectedCategoryId || '',
         selectedSubcategoryId: user.selectedSubcategoryId || '',
-        profilePhotoUrl: ''
+        profilePhotoUrl: '',
+        whatsappScannerImageUrl: user.whatsappScannerImage || '',
+        customLink: user.customLink || ''
       });
       setPhotoPreview(user.profilePhoto ? (user.profilePhoto.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${user.profilePhoto}` : user.profilePhoto) : null);
       setPhoto(null);
+      setWhatsappPhotoPreview(user.whatsappScannerImage ? (user.whatsappScannerImage.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${user.whatsappScannerImage}` : user.whatsappScannerImage) : null);
+      setWhatsappPhoto(null);
       setError('');
       setSuccess(false);
     }
@@ -101,6 +110,15 @@ export default function ProfileModal({ isOpen, onClose }) {
     }
   };
 
+  const handleWhatsappPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setWhatsappPhoto(file);
+      setWhatsappPhotoPreview(URL.createObjectURL(file));
+      setFormData(prev => ({ ...prev, whatsappScannerImageUrl: '' }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -112,6 +130,9 @@ export default function ProfileModal({ isOpen, onClose }) {
       Object.keys(formData).forEach(key => data.append(key, formData[key]));
       if (photo) {
         data.append('profilePhoto', photo);
+      }
+      if (whatsappPhoto) {
+        data.append('whatsappScannerPhoto', whatsappPhoto);
       }
 
       const res = await API.put('/auth/profile', data, {
@@ -259,6 +280,40 @@ export default function ProfileModal({ isOpen, onClose }) {
                   </div>
                 </div>
               )}
+              
+              <div className="group border-t border-slate-100 pt-4 mt-4">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 transition-colors group-focus-within:text-orange-600">WhatsApp QR Scanner</label>
+                <div className="flex items-center gap-4">
+                  <div className="relative group/photo cursor-pointer shrink-0">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm bg-slate-100 flex items-center justify-center text-slate-400">
+                      {whatsappPhotoPreview ? (
+                        <img src={whatsappPhotoPreview} alt="QR" className="w-full h-full object-cover" />
+                      ) : (
+                        <Upload size={24} />
+                      )}
+                    </div>
+                    <label className="absolute inset-0 bg-slate-900/60 rounded-xl flex flex-col items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity cursor-pointer text-white">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Upload</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleWhatsappPhotoChange} />
+                    </label>
+                  </div>
+                  <div className="flex-1">
+                    <div className="relative">
+                      <LinkIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
+                      <input type="text" name="whatsappScannerImageUrl" value={formData.whatsappScannerImageUrl} onChange={handleChange} placeholder="Or paste QR link..." className="block w-full pl-9 pr-3 py-2 border-2 border-slate-100 rounded-xl bg-slate-50 text-slate-900 text-sm font-medium focus:bg-white focus:outline-none focus:border-orange-500 transition-all" />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 pl-1">Upload QR image or paste link.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 transition-colors group-focus-within:text-orange-600">Custom Link (For Other/Link Layout)</label>
+                <div className="relative">
+                  <LinkIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
+                  <input type="text" name="customLink" value={formData.customLink} onChange={handleChange} placeholder="e.g. https://policymart.com/agent" className="block w-full pl-12 pr-4 py-3 border-2 border-slate-100 rounded-2xl bg-slate-50 text-slate-900 font-medium focus:bg-white focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all" />
+                </div>
+              </div>
 
               <div className="group">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 transition-colors group-focus-within:text-orange-600">Primary Category</label>

@@ -30,6 +30,7 @@ function AppContent() {
   const isRegisterOrLoginOrAdminPath = 
     location.pathname === '/register' || 
     location.pathname === '/login' || 
+    location.pathname === '/pricing' || 
     location.pathname.startsWith('/admin');
 
   // Redirect logged-in user without active plan to register/payment page

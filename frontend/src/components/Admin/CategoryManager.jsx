@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import API from '../../services/api';
-import { Plus, FolderPlus, Trash2, X, FolderTree, Tag, Info, Folder, Edit } from 'lucide-react';
+import { Plus, FolderPlus, Trash2, X, FolderTree, Tag, Info, Folder, Edit, ChevronRight, ChevronDown } from 'lucide-react';
 
 // Tree helpers for nested subcategories
 const buildSubcategoryTree = (items, parentId = null) => {
@@ -21,12 +21,12 @@ const buildSubcategoryTree = (items, parentId = null) => {
   return branch;
 };
 
-const flattenSubcategoryTree = (tree, depth = 0) => {
+const flattenSubcategoryTree = (tree, expandedNodes, depth = 0) => {
   let flat = [];
   tree.forEach(node => {
-    flat.push({ ...node, depth });
-    if (node.children && node.children.length > 0) {
-      flat = [...flat, ...flattenSubcategoryTree(node.children, depth + 1)];
+    flat.push({ ...node, depth, hasChildren: node.children && node.children.length > 0 });
+    if (expandedNodes[node._id] && node.children && node.children.length > 0) {
+      flat = [...flat, ...flattenSubcategoryTree(node.children, expandedNodes, depth + 1)];
     }
   });
   return flat;
@@ -41,9 +41,12 @@ export default function CategoryManager() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Tree State
+  const [expandedSubcats, setExpandedSubcats] = useState({});
+
   // Form States
-  const [categoryForm, setCategoryForm] = useState({ name: '', icon: 'heartPulse', isClickable: true });
-  const [subcatForm, setSubcatForm] = useState({ categoryId: '', parentSubcategoryId: '', name: '', isClickable: true });
+  const [categoryForm, setCategoryForm] = useState({ name: '', icon: 'heartPulse', isClickable: true, addonPrice: 1499, isLeaderCategory: false });
+  const [subcatForm, setSubcatForm] = useState({ categoryId: '', parentSubcategoryId: '', name: '', isClickable: true, isMainSubcategory: false, addonPrice: 1499, isLeaderCategory: false });
 
   // Editing States
   const [editingCategoryId, setEditingCategoryId] = useState(null);
@@ -57,7 +60,7 @@ export default function CategoryManager() {
         setCategories(res.data.data);
         if (res.data.data.length > 0 && !selectedCategoryId) {
           setSelectedCategoryId(res.data.data[0]._id);
-          setSubcatForm(prev => ({ ...prev, categoryId: res.data.data[0]._id, parentSubcategoryId: '' }));
+          setSubcatForm(prev => ({ ...prev, categoryId: res.data.data[0]._id, parentSubcategoryId: '', isMainSubcategory: false, addonPrice: 1499, isLeaderCategory: false }));
         }
       }
     } catch (err) {
@@ -86,8 +89,9 @@ export default function CategoryManager() {
     if (selectedCategoryId) {
       fetchSubcategories(selectedCategoryId);
       if (!editingSubcategoryId) {
-        setSubcatForm(prev => ({ ...prev, categoryId: selectedCategoryId, parentSubcategoryId: '' }));
+        setSubcatForm(prev => ({ ...prev, categoryId: selectedCategoryId, parentSubcategoryId: '', isMainSubcategory: false, addonPrice: 1499, isLeaderCategory: false }));
       }
+      setExpandedSubcats({}); // reset expansions on category change
     } else {
       setSubcategories([]);
     }
@@ -103,7 +107,7 @@ export default function CategoryManager() {
         const res = await API.put(`/admin/categories/${editingCategoryId}`, categoryForm);
         if (res.data.success) {
           setMessage('Success: Category updated successfully!');
-          setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true });
+          setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true, addonPrice: 1499, isLeaderCategory: false });
           setEditingCategoryId(null);
           await fetchCategories();
         }
@@ -111,7 +115,7 @@ export default function CategoryManager() {
         const res = await API.post('/admin/categories', categoryForm);
         if (res.data.success) {
           setMessage('Success: Category created successfully!');
-          setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true });
+          setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true, addonPrice: 1499, isLeaderCategory: false });
           await fetchCategories();
         }
       }
@@ -152,7 +156,7 @@ export default function CategoryManager() {
         const res = await API.put(`/admin/subcategories/${editingSubcategoryId}`, subcatForm);
         if (res.data.success) {
           setMessage('Success: Subcategory updated successfully!');
-          setSubcatForm(prev => ({ ...prev, name: '', parentSubcategoryId: '', isClickable: true }));
+          setSubcatForm(prev => ({ ...prev, name: '', parentSubcategoryId: '', isClickable: true, isMainSubcategory: false, addonPrice: 1499, isLeaderCategory: false }));
           setEditingSubcategoryId(null);
           await fetchSubcategories(selectedCategoryId);
         }
@@ -160,7 +164,7 @@ export default function CategoryManager() {
         const res = await API.post('/admin/subcategories', subcatForm);
         if (res.data.success) {
           setMessage('Success: Subcategory created successfully!');
-          setSubcatForm(prev => ({ ...prev, name: '', parentSubcategoryId: '', isClickable: true }));
+          setSubcatForm(prev => ({ ...prev, name: '', parentSubcategoryId: '', isClickable: true, isMainSubcategory: false, addonPrice: 1499, isLeaderCategory: false }));
           await fetchSubcategories(selectedCategoryId);
         }
       }
@@ -188,13 +192,15 @@ export default function CategoryManager() {
     setCategoryForm({
       name: category.name,
       icon: category.icon || 'briefcase',
-      isClickable: category.isClickable !== false
+      isClickable: category.isClickable !== false,
+      addonPrice: category.addonPrice !== undefined ? category.addonPrice : 1499,
+      isLeaderCategory: category.isLeaderCategory || false
     });
     setEditingCategoryId(category._id);
   };
 
   const cancelEditCategory = () => {
-    setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true });
+    setCategoryForm({ name: '', icon: 'heartPulse', isClickable: true, addonPrice: 1499, isLeaderCategory: false });
     setEditingCategoryId(null);
   };
 
@@ -203,7 +209,10 @@ export default function CategoryManager() {
       categoryId: subcat.categoryId?._id || subcat.categoryId,
       parentSubcategoryId: subcat.parentSubcategoryId?._id || subcat.parentSubcategoryId || '',
       name: subcat.name,
-      isClickable: subcat.isClickable !== false
+      isClickable: subcat.isClickable !== false,
+      isMainSubcategory: subcat.isMainSubcategory || false,
+      addonPrice: subcat.addonPrice !== undefined ? subcat.addonPrice : 1499,
+      isLeaderCategory: subcat.isLeaderCategory || false
     });
     setEditingSubcategoryId(subcat._id);
   };
@@ -213,13 +222,26 @@ export default function CategoryManager() {
       categoryId: selectedCategoryId,
       parentSubcategoryId: '',
       name: '',
-      isClickable: true
+      isClickable: true,
+      isMainSubcategory: false,
+      addonPrice: 1499,
+      isLeaderCategory: false
     });
     setEditingSubcategoryId(null);
   };
 
+  const toggleExpand = (id) => {
+    setExpandedSubcats(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
   const subcategoryTree = buildSubcategoryTree(subcategories);
-  const orderedSubcategories = flattenSubcategoryTree(subcategoryTree);
+  const orderedSubcategories = flattenSubcategoryTree(subcategoryTree, expandedSubcats);
+  
+  // For the dropdown (Parent Subcategory), we need the fully expanded tree
+  const allFlattenedSubcategories = flattenSubcategoryTree(subcategoryTree, subcategories.reduce((acc, s) => ({...acc, [s._id]: true}), {}));
 
   return (
     <div className="space-y-6">
@@ -291,17 +313,37 @@ export default function CategoryManager() {
                 placeholder="e.g. briefcase, shield, heartPulse"
               />
             </div>
-            
-            <div className="flex items-center space-x-2">
+
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                Add-on Price (₹)
+              </label>
               <input
-                type="checkbox"
-                id="catIsClickable"
-                checked={categoryForm.isClickable}
-                onChange={e => setCategoryForm({ ...categoryForm, isClickable: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500"
+                type="number"
+                value={categoryForm.addonPrice}
+                onChange={e => setCategoryForm({ ...categoryForm, addonPrice: e.target.value })}
+                className="w-full bg-[#0b1021] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
               />
-              <label htmlFor="catIsClickable" className="text-sm text-gray-300">
-                Make Link Clickable in Navbar
+            </div>
+            
+            <div className="flex flex-col space-y-3">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={categoryForm.isLeaderCategory}
+                  onChange={e => setCategoryForm({ ...categoryForm, isLeaderCategory: e.target.checked })}
+                  className="rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500 w-4 h-4"
+                />
+                <span className="text-xs text-gray-300 font-medium">Is Leader Category?</span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={categoryForm.isClickable}
+                  onChange={e => setCategoryForm({ ...categoryForm, isClickable: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500"
+                />
+                <span className="text-xs text-gray-300 font-medium cursor-pointer">Is Clickable (Shows inside app)</span>
               </label>
             </div>
 
@@ -432,7 +474,7 @@ export default function CategoryManager() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-white text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [&>option]:bg-[#0b0f19]"
                 >
                   <option value="">-- None (Root Level) --</option>
-                  {orderedSubcategories
+                  {allFlattenedSubcategories
                     .filter(s => !editingSubcategoryId || s._id !== editingSubcategoryId) // prevent parenting to self
                     .map(s => (
                       <option key={s._id} value={s._id}>
@@ -457,16 +499,51 @@ export default function CategoryManager() {
                 />
               </div>
               
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="subcatIsClickable"
-                  checked={subcatForm.isClickable}
-                  onChange={e => setSubcatForm({ ...subcatForm, isClickable: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500"
-                />
-                <label htmlFor="subcatIsClickable" className="text-sm text-gray-300">
-                  Make Link Clickable in Navbar
+              <div className="flex flex-col space-y-3">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={subcatForm.isMainSubcategory}
+                    onChange={e => setSubcatForm({ ...subcatForm, isMainSubcategory: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                  />
+                  <span className="text-xs text-gray-300 font-medium">Is Main Subcategory (Shows in Subscription Selection)?</span>
+                </label>
+                
+                {subcatForm.isMainSubcategory && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                        Add-on Price (₹)
+                      </label>
+                      <input
+                        type="number"
+                        value={subcatForm.addonPrice}
+                        onChange={e => setSubcatForm({ ...subcatForm, addonPrice: e.target.value })}
+                        className="w-full bg-[#0b1021] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={subcatForm.isLeaderCategory}
+                        onChange={e => setSubcatForm({ ...subcatForm, isLeaderCategory: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                      />
+                      <span className="text-xs text-gray-300 font-medium">Is Leader Subcategory?</span>
+                    </label>
+                  </>
+                )}
+
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={subcatForm.isClickable}
+                    onChange={e => setSubcatForm({ ...subcatForm, isClickable: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs text-gray-300 font-medium">Make Link Clickable in Navbar</span>
                 </label>
               </div>
 
@@ -525,9 +602,23 @@ export default function CategoryManager() {
                            className="flex items-center space-x-2" 
                            style={{ paddingLeft: `${sub.depth * 20}px` }}
                          >
-                           <span className="text-gray-500 font-mono text-xs">{sub.depth > 0 ? '└─ ' : ''}</span>
+                           {sub.hasChildren ? (
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); toggleExpand(sub._id); }}
+                               className="p-0.5 hover:bg-white/10 rounded cursor-pointer transition-colors"
+                             >
+                               {expandedSubcats[sub._id] ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+                             </button>
+                           ) : (
+                             <div className="w-[14px]"></div>
+                           )}
                            <Folder size={14} className={sub.depth > 0 ? "text-purple-400/70" : "text-purple-400"} />
-                           <span className={`${sub.depth > 0 ? 'text-purple-300/80 font-normal' : 'text-purple-200 font-bold'}`}>{sub.name}</span>
+                           <span 
+                             className={`${sub.depth > 0 ? 'text-purple-300/80 font-normal' : 'text-purple-200 font-bold'} cursor-pointer hover:text-white transition-colors`}
+                             onClick={() => sub.hasChildren && toggleExpand(sub._id)}
+                           >
+                             {sub.name}
+                           </span>
                          </div>
                        </td>
                         <td className="p-3 text-right">

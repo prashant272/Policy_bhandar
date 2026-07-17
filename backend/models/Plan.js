@@ -11,6 +11,23 @@ const planSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Please add a price']
   },
+  priceRenew: {
+    type: Number,
+    default: 0
+  },
+  segment: {
+    type: String,
+    enum: ['Agent', 'Leader', 'Combo'],
+    default: 'Agent'
+  },
+  categoryCount: {
+    type: Number,
+    default: 1
+  },
+  isLeaderIncluded: {
+    type: Boolean,
+    default: false
+  },
   validityDays: {
     type: Number,
     required: [true, 'Please add validity in days (e.g. 30, 365)']

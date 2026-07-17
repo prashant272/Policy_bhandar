@@ -38,7 +38,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="flex bg-[#070a13] min-h-screen text-slate-100 w-full admin-dark-mode">
+    <div className="flex bg-[#070a13] h-screen overflow-hidden text-slate-100 w-full admin-dark-mode">
       
       {/* Admin Sidebar Navigation */}
       <AdminSidebar 
@@ -49,7 +49,7 @@ export default function AdminDashboard() {
       />
 
       {/* Main Panel Content Area */}
-      <main className="flex-grow p-8 overflow-y-auto max-h-screen">
+      <main className="flex-grow p-8 overflow-y-auto h-full">
         <div className="max-w-6xl mx-auto">
           {renderContent()}
         </div>

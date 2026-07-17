@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Check, Zap, DownloadCloud, Star } from 'lucide-react';
 import API from '../services/api';
@@ -11,22 +12,96 @@ export default function PricingPage() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [selectedPlanForConfirmation, setSelectedPlanForConfirmation] = useState(null);
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedAddons, setSelectedAddons] = useState([]);
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (selectedPlanForConfirmation) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedPlanForConfirmation]);
 
   useEffect(() => {
-    const fetchPlans = async () => {
+    const fetchPlansAndCategories = async () => {
       try {
-        const res = await API.get('/plans');
-        if (res.data.success) {
-          setPlans(res.data.data.filter(p => p.isActive));
+        const [plansRes, subcatRes] = await Promise.all([
+          API.get('/plans'),
+          API.get('/materials/subcategories')
+        ]);
+        if (plansRes.data.success) {
+          setPlans(plansRes.data.data.filter(p => p.isActive));
+        }
+        if (subcatRes.data.success) {
+          // Only show Main Subcategories for selection
+          setAvailableCategories(subcatRes.data.data.filter(s => s.isMainSubcategory));
         }
       } catch (err) {
-        console.error('Error fetching plans:', err);
+        console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchPlans();
+    fetchPlansAndCategories();
   }, []);
+
+  const handleCategoryToggle = (catId, isLeaderCat, addonPrice) => {
+    if (!selectedPlanForConfirmation) return;
+    const plan = selectedPlanForConfirmation;
+    
+    // Check if it's already selected as base or addon
+    const isBaseSelected = selectedCategories.includes(catId);
+    const isAddonSelected = selectedAddons.includes(catId);
+    
+    if (isBaseSelected) {
+      setSelectedCategories(prev => prev.filter(id => id !== catId));
+    } else if (isAddonSelected) {
+      setSelectedAddons(prev => prev.filter(id => id !== catId));
+    } else {
+      // Trying to select a new category
+      
+      // If it's a leader category and plan doesn't include leader, they can't select it as base or addon (or maybe as addon? for now prevent)
+      if (isLeaderCat && !plan.isLeaderIncluded) {
+        alert("This is a Leader segment category. Please select a Leader or Combo plan.");
+        return;
+      }
+
+      if (selectedCategories.length < plan.categoryCount) {
+        setSelectedCategories(prev => [...prev, catId]);
+      } else {
+        // Exceeded base categories, goes to addons
+        setSelectedAddons(prev => [...prev, catId]);
+      }
+    }
+  };
+
+  const calculateTotal = () => {
+    if (!selectedPlanForConfirmation) return 0;
+    let base = selectedPlanForConfirmation.price;
+    let addonsTotal = 0;
+    selectedAddons.forEach(id => {
+      const cat = availableCategories.find(c => c._id === id);
+      if (cat) addonsTotal += (cat.addonPrice || 1499);
+    });
+    return Math.round((base + addonsTotal) * 1.18);
+  };
+  
+  const calculateGST = () => {
+    if (!selectedPlanForConfirmation) return 0;
+    let base = selectedPlanForConfirmation.price;
+    let addonsTotal = 0;
+    selectedAddons.forEach(id => {
+      const cat = availableCategories.find(c => c._id === id);
+      if (cat) addonsTotal += (cat.addonPrice || 1499);
+    });
+    return Math.round((base + addonsTotal) * 0.18);
+  };
+
 
   const handlePaymentClick = (plan) => {
     if (!user) {
@@ -38,36 +113,49 @@ export default function PricingPage() {
   };
 
   const processPayment = async (plan) => {
+    if (selectedCategories.length < plan.categoryCount && availableCategories.length >= plan.categoryCount) {
+       if(!window.confirm(`You haven't selected all your ${plan.categoryCount} free categories. Proceed anyway?`)) {
+           return;
+       }
+    }
+
+    const finalPlan = selectedPlanForConfirmation;
+    const catsToSubmit = selectedCategories;
+    const addonsToSubmit = selectedAddons;
+    
     setSelectedPlanForConfirmation(null);
     setProcessingId(plan._id);
     try {
-      // 1. Create order
-      const orderRes = await API.post('/payments/create-order', { planId: plan._id });
-      if (!orderRes.data.success) throw new Error('Order creation failed');
+      // 1. Create Subscription
+      const subRes = await API.post('/payments/create-subscription', { 
+        planId: plan._id,
+        selectedAddons: addonsToSubmit
+      });
+      if (!subRes.data.success) throw new Error('Subscription creation failed');
       
-      const { data: orderData, key } = orderRes.data;
+      const { data: subData, key } = subRes.data;
 
-      // 2. Open Razorpay Checkout
+      // 2. Open Razorpay Checkout for Autopay
       const options = {
         key: key,
-        amount: orderData.amount,
-        currency: orderData.currency,
+        subscription_id: subData.id,
         name: 'Policybhandar',
-        description: `Upgrade to ${plan.name}`,
-        order_id: orderData.id,
+        description: `${plan.name} - 15 Days Free Trial`,
         handler: async function (response) {
           try {
-            // 3. Verify Payment
-            const verifyRes = await API.post('/payments/verify', {
+            // 3. Verify Subscription
+            const verifyRes = await API.post('/payments/verify-subscription', {
               razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
               razorpay_signature: response.razorpay_signature,
-              planId: plan._id
+              planId: plan._id,
+              selectedCategories: catsToSubmit,
+              selectedAddons: addonsToSubmit
             });
 
             if (verifyRes.data.success) {
               await fetchUser(); // refresh user data to get new activePlan
-              window.alert('Payment Successful! Your plan is upgraded.');
+              window.alert('Autopay & subscription activated! 15 days free trial started.');
               navigate('/category/all');
             }
           } catch (err) {
@@ -232,40 +320,88 @@ export default function PricingPage() {
       </div>
 
       {/* Confirmation Modal */}
-      {selectedPlanForConfirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
+      {selectedPlanForConfirmation && createPortal(
+        <div className="fixed inset-0 p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm overflow-y-auto flex justify-center" style={{ zIndex: 9999 }}>
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl relative mt-24 mb-10 h-fit">
             <button 
-              onClick={() => setSelectedPlanForConfirmation(null)}
+              onClick={() => {
+                setSelectedPlanForConfirmation(null);
+                setSelectedCategories([]);
+                setSelectedAddons([]);
+              }}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
             >
               ✕
             </button>
-            <h3 className="text-2xl font-black text-slate-900 mb-6 text-center">Confirm Payment</h3>
+            <h3 className="text-2xl font-black text-slate-900 mb-2 text-center">Customize Your Subscription</h3>
+            <p className="text-sm text-slate-500 text-center mb-6">You can select up to {selectedPlanForConfirmation.categoryCount} categories. Additional selections will be charged as add-ons.</p>
             
-            <div className="space-y-4 mb-8">
+            <div className="mb-6">
+              <h4 className="font-bold text-slate-700 mb-3">Select Categories:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {availableCategories.length === 0 && (
+                  <p className="text-sm text-slate-500 col-span-full">No Main Subcategories found. Please configure them in the Admin Panel.</p>
+                )}
+                {availableCategories.map(cat => {
+                   const isBase = selectedCategories.includes(cat._id);
+                   const isAddon = selectedAddons.includes(cat._id);
+                   const isSelected = isBase || isAddon;
+                   
+                   return (
+                     <div 
+                       key={cat._id}
+                       onClick={() => handleCategoryToggle(cat._id, cat.isLeaderCategory, cat.addonPrice)}
+                       className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                         isSelected ? 'border-orange-500 bg-orange-50' : 'border-slate-200 hover:border-orange-200'
+                       }`}
+                     >
+                       <div className="flex justify-between items-center">
+                         <span className={`font-bold ${isSelected ? 'text-orange-700' : 'text-slate-700'}`}>{cat.name}</span>
+                         {isBase && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Included</span>}
+                         {isAddon && <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">+₹{cat.addonPrice || 1499}</span>}
+                         {!isSelected && cat.isLeaderCategory && <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">Leader</span>}
+                       </div>
+                     </div>
+                   );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3 mb-8 bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <div className="flex justify-between text-slate-600 font-medium">
-                <span>Plan Price:</span>
+                <span>{selectedPlanForConfirmation.name} Plan:</span>
                 <span>₹{selectedPlanForConfirmation.price}</span>
               </div>
-              <div className="flex justify-between text-slate-600 font-medium pb-4 border-b border-slate-100">
+              {selectedAddons.length > 0 && (
+                <div className="flex justify-between text-purple-600 font-medium">
+                  <span>Add-ons ({selectedAddons.length}):</span>
+                  <span>+₹{
+                     selectedAddons.reduce((sum, id) => {
+                       const cat = availableCategories.find(c => c._id === id);
+                       return sum + (cat ? (cat.addonPrice || 1499) : 0);
+                     }, 0)
+                  }</span>
+                </div>
+              )}
+              <div className="flex justify-between text-slate-600 font-medium pb-4 border-b border-slate-200">
                 <span>GST (18%):</span>
-                <span>₹{Math.round(selectedPlanForConfirmation.price * 0.18)}</span>
+                <span>₹{calculateGST()}</span>
               </div>
               <div className="flex justify-between text-xl font-black text-slate-900">
                 <span>Total Amount:</span>
-                <span>₹{Math.round(selectedPlanForConfirmation.price * 1.18)}</span>
+                <span>₹{calculateTotal()}</span>
               </div>
             </div>
 
             <button 
               onClick={() => processPayment(selectedPlanForConfirmation)}
-              className="w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white bg-gradient-premium hover:bg-gradient-premium-hover shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300"
+              className="w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white bg-gradient-premium hover:bg-gradient-premium-hover shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300 flex items-center justify-center gap-2"
             >
-              Proceed to Payment
+              <Zap size={18} fill="currentColor" /> Start 15 Days Free Trial
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

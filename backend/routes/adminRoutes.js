@@ -16,7 +16,8 @@ const {
   deleteMaterial,
   deleteCategory,
   deleteSubcategory,
-  getContacts
+  getContacts,
+  deleteUser
 } = require('../controllers/adminController');
 const { protect, authorize } = require('../middlewares/auth');
 
@@ -42,6 +43,7 @@ router.delete('/materials/:id', deleteMaterial);
 // SuperAdmin only routes
 router.get('/users', authorize('SuperAdmin'), getUsers);
 router.put('/users/:id', authorize('SuperAdmin'), updateUser);
+router.delete('/users/:id', authorize('SuperAdmin'), deleteUser);
 router.get('/contacts', authorize('SuperAdmin'), getContacts);
 
 module.exports = router;

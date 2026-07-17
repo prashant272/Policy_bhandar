@@ -14,7 +14,7 @@ export default function AdminSidebar({ activeTab, setActiveTab, user, onLogout }
   ];
 
   return (
-    <aside className="w-64 bg-slate-950/40 border-r border-white/5 flex flex-col h-screen sticky top-0">
+    <aside className="w-64 bg-slate-950/40 border-r border-white/5 flex flex-col h-screen overflow-y-auto sticky top-0">
       
       {/* Sidebar Header Logo */}
       <div className="p-6 border-b border-white/5 flex items-center space-x-3">

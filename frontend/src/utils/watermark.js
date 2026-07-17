@@ -3,14 +3,15 @@
  * @param {string} imageUrl - The source URL of the image banner.
  * @param {object} agent - The agent data { name, mobile, company, agentType, profilePhoto }.
  * @param {object} template - Optional template configuration from admin.
+ * @param {string} watermarkType - 'digicard', 'whatsapp', or 'link'.
  * @returns {Promise<string>} - Resolves to a data URL of the watermarked image.
  */
-export const watermarkImage = (imageUrl, agent, template = null) => {
+export const watermarkImage = (imageUrl, agent, template = null, watermarkType = 'digicard') => {
   return new Promise((resolve, reject) => {
     const processImage = async () => {
       try {
         // Default template config if none provided
-        const config = template || {
+        let config = template || {
           layoutType: 'bottom-bar',
           backgroundColor: 'rgba(7, 10, 19, 0.78)',
           textColor: '#ffffff',
@@ -25,6 +26,17 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
           imageScale: 100,
           showSocialIcons: true
         };
+
+        if (watermarkType === 'whatsapp' || watermarkType === 'link') {
+          config = {
+            ...config,
+            layoutType: watermarkType === 'whatsapp' ? 'qr-append-bottom' : 'link-append-bottom',
+            appendMode: true,
+            backgroundColor: '#ffffff',
+            textColor: '#0f172a',
+            borderColor: '#e2e8f0'
+          };
+        }
 
         const scaleMultiplier = (config.sizeScale || 100) / 100;
         const imageScaleMultiplier = (config.imageScale || 100) / 100;
@@ -85,6 +97,14 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
           avatar = await loadImageSecurely(agent.profilePhoto);
         }
 
+        let qrAvatar = null;
+        if (watermarkType === 'whatsapp' || watermarkType === 'link') {
+          const qrUrl = agent.whatsappScannerImage || agent.profilePhoto;
+          if (qrUrl) {
+            qrAvatar = await loadImageSecurely(qrUrl);
+          }
+        }
+
         // 3. Load custom logo if configured
         let logo = null;
         if (config.logoUrl) {
@@ -95,11 +115,24 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
-        const isAppend = config.appendMode && config.layoutType.includes('bottom');
+        const isAppend = config.appendMode && (config.layoutType.includes('bottom') || config.layoutType.includes('append'));
 
         let cardHeight;
         if (config.layoutType === 'professional-bottom') {
           cardHeight = Math.max(120, Math.round(img.naturalHeight * 0.18)) * scaleMultiplier;
+        } else if (config.layoutType === 'qr-append-bottom' || config.layoutType === 'link-append-bottom') {
+          // Base height on canvas width (which is img.naturalWidth) so narrow images still get a tall enough card
+          let expectedQrHeight = canvas.width * 0.4; 
+          if (typeof qrAvatar !== 'undefined' && qrAvatar && qrAvatar.width) {
+             // Let the QR code take up to 40% of the canvas width, calculate height based on its aspect ratio
+             const qrAspect = qrAvatar.height / qrAvatar.width;
+             expectedQrHeight = (canvas.width * 0.4) * qrAspect;
+          }
+          // The total card needs space for the curve + top text + QR code + bottom text
+          const verticalPadding = canvas.width * 0.3; // 30% of width for texts and padding
+          cardHeight = Math.round(expectedQrHeight + verticalPadding) * scaleMultiplier;
+          // Ensure a minimum height just in case
+          cardHeight = Math.max(cardHeight, Math.round(img.naturalHeight * 0.25) * scaleMultiplier);
         } else {
           cardHeight = Math.max(70, Math.round(img.naturalHeight * 0.15)) * scaleMultiplier;
         }
@@ -107,8 +140,8 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
         canvas.width = img.naturalWidth;
         canvas.height = isAppend ? img.naturalHeight + cardHeight : img.naturalHeight;
 
-        // Fill white background for the appended part
-        if (isAppend) {
+        // Fill white background for the appended part (non-QR)
+        if (isAppend && config.layoutType !== 'qr-append-bottom' && config.layoutType !== 'link-append-bottom') {
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
@@ -116,20 +149,42 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
         // Draw original image
         ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
 
-        let cardWidth, cardX, cardY;
-        const margin = Math.round(img.height * 0.04);
+        // Draw curved white background for QR
+        if (isAppend && (config.layoutType === 'qr-append-bottom' || config.layoutType === 'link-append-bottom')) {
+          const curveHeight = Math.round(canvas.width * 0.16);
+          
+          ctx.save();
+          // Add drop shadow to make the curve pop against any background (even white padding)
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+          ctx.shadowBlur = Math.round(canvas.width * 0.015);
+          ctx.shadowOffsetY = -Math.round(canvas.width * 0.005);
+          
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.moveTo(0, img.naturalHeight);
+          // Curve upwards into the image
+          ctx.quadraticCurveTo(canvas.width / 2, img.naturalHeight - curveHeight * 2.5, canvas.width, img.naturalHeight);
+          ctx.lineTo(canvas.width, canvas.height);
+          ctx.lineTo(0, canvas.height);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
 
-        if (config.layoutType === 'professional-bottom') {
+        let cardWidth, cardX, cardY;
+        const margin = Math.round(img.naturalHeight * 0.04);
+
+        if (config.layoutType === 'professional-bottom' || config.layoutType === 'qr-append-bottom' || config.layoutType === 'link-append-bottom') {
           cardWidth = canvas.width;
           cardX = 0;
-          cardY = isAppend ? img.height : canvas.height - cardHeight;
+          cardY = isAppend ? img.naturalHeight : canvas.height - cardHeight;
         } else if (config.layoutType.includes('bar')) {
           cardWidth = Math.round(canvas.width * 0.92) * scaleMultiplier;
           cardX = Math.round((canvas.width - cardWidth) / 2);
           if (config.layoutType === 'top-bar') {
             cardY = margin;
           } else {
-            cardY = isAppend ? img.height : canvas.height - cardHeight - margin;
+            cardY = isAppend ? img.naturalHeight : canvas.height - cardHeight - margin;
           }
         } else {
           // box layout
@@ -143,16 +198,17 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
           if (config.layoutType.includes('top')) {
             cardY = margin;
           } else {
-            cardY = isAppend ? img.height : canvas.height - cardHeight - margin;
+            cardY = isAppend ? img.naturalHeight : canvas.height - cardHeight - margin;
           }
         }
 
         const isProf = config.layoutType === 'professional-bottom';
-        const radius = isProf ? 0 : Math.round(cardHeight * 0.15);
+        const isQR = config.layoutType === 'qr-append-bottom' || config.layoutType === 'link-append-bottom';
+        const radius = (isProf || isQR) ? 0 : Math.round(cardHeight * 0.15);
 
         // Draw translucent glass card background
         ctx.beginPath();
-        if (typeof ctx.roundRect === 'function' && !isProf && !isAppend) {
+        if (typeof ctx.roundRect === 'function' && !isProf && !isQR && !isAppend) {
           ctx.roundRect(cardX, cardY, cardWidth, cardHeight, radius);
         } else {
           ctx.rect(cardX, cardY, cardWidth, cardHeight);
@@ -163,7 +219,7 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
         }
 
         // Draw borders around card
-        if (config.backgroundColor !== 'transparent') {
+        if (config.backgroundColor !== 'transparent' && !isQR) {
           if (isProf) {
             ctx.beginPath();
             ctx.moveTo(cardX, cardY);
@@ -173,7 +229,7 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
             ctx.stroke();
           } else {
             ctx.strokeStyle = config.borderColor;
-            ctx.lineWidth = Math.max(1.5, Math.round(img.height * 0.0035));
+            ctx.lineWidth = Math.max(1.5, Math.round(img.naturalHeight * 0.0035));
             ctx.stroke();
           }
         }
@@ -182,7 +238,111 @@ export const watermarkImage = (imageUrl, agent, template = null) => {
         const centerY = cardY + cardHeight / 2;
         let currentX = cardX + paddingX;
 
-        if (isProf) {
+        if (isQR) {
+          // Special centered layout for QR/Link matching the reference design
+          const centerX = canvas.width / 2;
+          
+          // Start drawing a bit higher because of the curve we added
+          const curveOffset = Math.round(canvas.width * 0.05);
+          let currentY = img.naturalHeight - curveOffset; 
+
+          // Top Banner Text
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.font = `bold ${Math.round(cardHeight * 0.08)}px "Plus Jakarta Sans", sans-serif`;
+          ctx.fillStyle = '#1e293b'; // Dark slate
+          let headerText = 'अधिक जानकारी के लिए QR SCAN करें..';
+          
+          if (config.layoutType === 'link-append-bottom') {
+            headerText = agent.customLink ? agent.customLink : 'For more info, please click the link below or scan..';
+          }
+          
+          ctx.fillText(headerText, centerX, currentY);
+
+          currentY += Math.round(cardHeight * 0.12);
+
+          // We set maxQrWidth to 45% of canvas width to make it wider, and allow maxQrHeight to take most of the card height
+          const maxQrWidth = Math.round(canvas.width * 0.45);
+          const maxQrHeight = Math.round(cardHeight * 0.70);
+          
+          let qrWidth = maxQrWidth;
+          let qrHeight = maxQrHeight;
+
+          if (qrAvatar) {
+             const ratio = Math.min(maxQrWidth / qrAvatar.width, maxQrHeight / qrAvatar.height);
+             qrWidth = Math.round(qrAvatar.width * ratio);
+             qrHeight = Math.round(qrAvatar.height * ratio);
+          }
+
+          const qrX = centerX - qrWidth / 2;
+          
+          if (qrAvatar) {
+             ctx.drawImage(qrAvatar, qrX, currentY, qrWidth, qrHeight);
+          } else {
+             ctx.fillStyle = '#f1f5f9';
+             ctx.fillRect(qrX, currentY, qrWidth, qrHeight);
+             ctx.fillStyle = '#94a3b8';
+             ctx.font = `${Math.round(qrHeight * 0.2)}px sans-serif`;
+             ctx.fillText('NO QR', centerX, currentY + qrHeight / 2);
+          }
+          
+          // Draw full red border around QR
+          ctx.strokeStyle = '#dc2626'; // Red 600
+          ctx.lineWidth = Math.max(4, Math.round(canvas.width * 0.008));
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.strokeRect(qrX, currentY, qrWidth, qrHeight);
+
+          currentY += qrHeight + Math.round(cardHeight * 0.12);
+
+          // Name and Phone on same line
+          const nameText = (agent.name || '').toUpperCase();
+          const phoneText = agent.mobile ? `📞 ${agent.mobile}` : '';
+          
+          let fontSize = Math.round(cardHeight * 0.08);
+          // Scale font size based on canvas width instead of just cardHeight to prevent cut off on narrow images
+          const maxFontSize = Math.round(canvas.width * 0.05);
+          fontSize = Math.min(fontSize, maxFontSize);
+          
+          ctx.font = `bold ${fontSize}px "Plus Jakarta Sans", sans-serif`;
+          ctx.textBaseline = 'middle';
+          
+          if (nameText && phoneText) {
+             // Prevent text cut-off on narrow images by scaling down if needed
+             const nameWidth = ctx.measureText(nameText).width;
+             const phoneWidth = ctx.measureText(phoneText).width;
+             const maxSide = Math.max(nameWidth, phoneWidth);
+             const availableSide = canvas.width * 0.45; // 45% for each side
+             
+             if (maxSide > availableSide) {
+                fontSize = Math.floor(fontSize * (availableSide / maxSide));
+                ctx.font = `bold ${fontSize}px "Plus Jakarta Sans", sans-serif`;
+             }
+          
+             ctx.fillStyle = '#0f172a';
+             ctx.textAlign = 'right';
+             ctx.fillText(nameText, centerX - Math.round(canvas.width * 0.03), currentY);
+             
+             // Divider
+             ctx.fillStyle = '#cbd5e1';
+             ctx.textAlign = 'center';
+             ctx.fillText('|', centerX, currentY - 2);
+             
+             ctx.fillStyle = '#334155';
+             ctx.textAlign = 'left';
+             ctx.fillText(phoneText, centerX + Math.round(canvas.width * 0.03), currentY);
+          } else if (nameText || phoneText) {
+             const textW = ctx.measureText(nameText || phoneText).width;
+             if (textW > canvas.width * 0.9) {
+                fontSize = Math.floor(fontSize * ((canvas.width * 0.9) / textW));
+                ctx.font = `bold ${fontSize}px "Plus Jakarta Sans", sans-serif`;
+             }
+             
+             ctx.textAlign = 'center';
+             ctx.fillStyle = nameText ? '#0f172a' : '#334155';
+             ctx.fillText(nameText || phoneText, centerX, currentY);
+          }
+        } else if (isProf) {
           // Professional layout logo/photo box
           const boxSize = Math.round(cardHeight * 0.75) * imageScaleMultiplier;
           const boxX = currentX;

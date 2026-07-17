@@ -21,12 +21,57 @@ export default function MaterialCard({
   const [downloading, setDownloading] = useState(false);
   const [internalPreviewOpen, setInternalPreviewOpen] = useState(false);
   
+  // Watermark Selection State
+  const [watermarkSelectionModalOpen, setWatermarkSelectionModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'preview' or 'download'
+  const [selectedResolutionForDownload, setSelectedResolutionForDownload] = useState(null);
+  const [watermarkType, setWatermarkType] = useState('digicard');
+  
   const previewOpen = activePreviewId !== undefined ? activePreviewId === material._id : internalPreviewOpen;
+
+  const handleOpenPreviewIntercept = () => {
+    if (!user) {
+      onOpenAuthModal();
+      return;
+    }
+    setPendingAction('preview');
+    setWatermarkSelectionModalOpen(true);
+  };
+
+  const handleDownloadIntercept = (selectedResolution = null) => {
+    if (downloading) return;
+    const resolution = typeof selectedResolution === 'string' ? selectedResolution : null;
+    if (!user) {
+      onOpenAuthModal();
+      return;
+    }
+    setSelectedResolutionForDownload(resolution);
+    setPendingAction('download');
+    setWatermarkSelectionModalOpen(true);
+  };
+
+  const proceedWithAction = (selectedType) => {
+    setWatermarkType(selectedType);
+    setWatermarkSelectionModalOpen(false);
+
+    if (pendingAction === 'preview') {
+      if (setActivePreviewId) setActivePreviewId(material._id);
+      else setInternalPreviewOpen(true);
+    } else if (pendingAction === 'download') {
+      // Re-trigger download logic bypassing interception
+      if ((material.type === 'Reel' || material.type === 'Video') && !selectedResolutionForDownload) {
+        setResolutionModalOpen(true);
+      } else {
+        performDownload(selectedResolutionForDownload, selectedType);
+      }
+    }
+  };
 
   const handleOpenPreview = () => {
     if (setActivePreviewId) setActivePreviewId(material._id);
     else setInternalPreviewOpen(true);
   };
+
 
   const handleClosePreview = () => {
     if (setActivePreviewId) setActivePreviewId(null);
@@ -47,7 +92,7 @@ export default function MaterialCard({
         ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}` 
         : material.fileUrl;
         
-      watermarkImage(proxyUrl, user, material.watermarkTemplateId)
+      watermarkImage(proxyUrl, user, material.watermarkTemplateId, watermarkType)
         .then(url => setPreviewUrl(url))
         .catch(err => {
           console.error("Failed to generate watermarked preview:", err);
@@ -56,7 +101,7 @@ export default function MaterialCard({
     } else {
       setPreviewUrl(material.fileUrl);
     }
-  }, [previewOpen, user, material.fileUrl, material.type]);
+  }, [previewOpen, user, material.fileUrl, material.type, watermarkType]);
 
   const getIcon = () => {
     switch (material.type) {
@@ -70,20 +115,14 @@ export default function MaterialCard({
     }
   };
 
-  const handleDownload = async (selectedResolution = null) => {
+  const handleDownload = (selectedResolution = null) => {
+    handleDownloadIntercept(selectedResolution);
+  };
+
+  const performDownload = async (resolution = null, activeWatermarkType = 'digicard') => {
     if (downloading) return;
-    // Ensure selectedResolution is a string (and not a React SyntheticEvent object)
-    const resolution = typeof selectedResolution === 'string' ? selectedResolution : null;
 
-    if (!user) {
-      onOpenAuthModal();
-      return;
-    }
 
-    if ((material.type === 'Reel' || material.type === 'Video') && !resolution) {
-      setResolutionModalOpen(true);
-      return;
-    }
 
     setDownloading(true);
     setResolutionModalOpen(false);
@@ -92,7 +131,7 @@ export default function MaterialCard({
 
     try {
       // 1. Call API to check/increment download count
-      const payload = {};
+      const payload = { watermarkType: activeWatermarkType };
       if (material.type === 'Reel' || material.type === 'Video') {
         payload.resolution = resolution;
         console.log('Sending download request with resolution:', resolution);
@@ -161,12 +200,12 @@ export default function MaterialCard({
         // 2. Perform Watermarking for Banners (Images)
         if (material.type === 'Banner') {
           try {
-            // Apply canvas overlay with template using proxy to avoid CORS
+              // Apply canvas overlay with template using proxy to avoid CORS
             const proxyUrl = material.fileUrl.startsWith('http') 
               ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}` 
               : material.fileUrl;
               
-            const watermarkedDataUrl = await watermarkImage(proxyUrl, user, material.watermarkTemplateId);
+            const watermarkedDataUrl = await watermarkImage(proxyUrl, user, material.watermarkTemplateId, activeWatermarkType);
             await triggerDownload(watermarkedDataUrl, `${material.title}-watermarked.jpg`);
           } catch (err) {
             console.error('Watermarking failed, downloading raw file', err);
@@ -444,7 +483,7 @@ export default function MaterialCard({
     <div className="glass-effect rounded-2xl overflow-hidden border border-white/5 shadow-lg group hover:border-indigo-500/20 hover:shadow-indigo-500/5 transition-all duration-300">
       {/* Thumbnail Container (Click to Preview) */}
       <div 
-        onClick={handleOpenPreview}
+        onClick={handleOpenPreviewIntercept}
         className="relative aspect-video w-full overflow-hidden bg-slate-950 cursor-pointer group/thumb"
       >
         { (material.type === 'Reel' || material.type === 'Video') ? (
@@ -593,7 +632,7 @@ export default function MaterialCard({
                 )}
 
                 <button
-                  onClick={handleDownload}
+                  onClick={() => handleDownloadIntercept(null)}
                   disabled={downloading}
                   className="bg-gradient-premium hover:bg-gradient-premium-hover text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center gap-2 relative overflow-hidden"
                 >
@@ -721,7 +760,7 @@ export default function MaterialCard({
               ].map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => handleDownload(opt.value)}
+                  onClick={() => performDownload(opt.value, watermarkType)}
                   className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 hover:border-indigo-500/40 rounded-2xl p-4 transition-all duration-200 cursor-pointer group active:scale-[0.99] flex flex-col justify-start"
                 >
                   <div className="font-semibold text-white group-hover:text-indigo-400 transition-colors flex items-center justify-between">
@@ -741,6 +780,79 @@ export default function MaterialCard({
                 Cancel
               </button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Watermark Selection Modal */}
+      {watermarkSelectionModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl shadow-indigo-500/10 relative overflow-hidden">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white">Qr Code</h3>
+              <button 
+                onClick={() => setWatermarkSelectionModalOpen(false)}
+                className="text-gray-400 hover:text-white p-1.5 bg-white/5 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center gap-4 mb-8">
+              {/* DigiCard Option */}
+              <button
+                onClick={() => setWatermarkType('digicard')}
+                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                  watermarkType === 'digicard' ? 'border-[#82b440] bg-[#82b440]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
+                }`}
+              >
+                <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-2 p-1">
+                  <div className="w-full h-full bg-[#fde68a] rounded flex items-center justify-center overflow-hidden relative">
+                     {/* Pseudo DigiCard Icon */}
+                     <div className="absolute top-1 left-1 w-3 h-3 bg-blue-400 rounded-sm"></div>
+                     <div className="absolute top-1 right-1 w-4 h-1 bg-orange-400 rounded-sm"></div>
+                     <div className="absolute top-2.5 right-1 w-4 h-1 bg-orange-400 rounded-sm"></div>
+                  </div>
+                </div>
+                <span className={`text-sm font-medium ${watermarkType === 'digicard' ? 'text-white' : 'text-gray-400'}`}>DigiCard</span>
+              </button>
+
+              {/* WhatsApp Option */}
+              <button
+                onClick={() => setWatermarkType('whatsapp')}
+                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                  watermarkType === 'whatsapp' ? 'border-[#25D366] bg-[#25D366]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-full bg-[#25D366] flex items-center justify-center mb-2">
+                  <svg viewBox="0 0 24 24" className="w-8 h-8 text-white" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+                  </svg>
+                </div>
+                <span className={`text-sm font-medium ${watermarkType === 'whatsapp' ? 'text-[#25D366]' : 'text-gray-400'}`}>WhatsApp</span>
+              </button>
+
+              {/* Other/Link Option */}
+              <button
+                onClick={() => setWatermarkType('link')}
+                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                  watermarkType === 'link' ? 'border-[#38bdf8] bg-[#38bdf8]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-lg bg-[#e0f2fe] flex items-center justify-center mb-2">
+                  <svg className="w-6 h-6 text-[#0284c7]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                </div>
+                <span className={`text-sm font-medium ${watermarkType === 'link' ? 'text-white' : 'text-gray-400'}`}>Other</span>
+              </button>
+            </div>
+
+            <button 
+              onClick={() => proceedWithAction(watermarkType)}
+              className="w-full py-3.5 bg-[#82b440] hover:bg-[#6c9833] text-white rounded-xl font-bold transition-all cursor-pointer active:scale-[0.98] shadow-lg shadow-[#82b440]/30"
+            >
+              Continue
+            </button>
           </div>
         </div>,
         document.body
