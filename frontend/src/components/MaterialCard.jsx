@@ -229,8 +229,20 @@ export default function MaterialCard({
           }
         } else {
           const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
-          const directUrl = `${apiBase}/materials/download-direct?file=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(material.title + '-' + material.type + '.mp4')}`;
-          await triggerDownload(directUrl, `${material.title}-${material.type}.mp4`);
+          
+          let ext = 'mp4';
+          if (fileUrl) {
+            const parts = fileUrl.split('?')[0].split('.');
+            if (parts.length > 1) {
+              ext = parts.pop();
+            } else if (material.type === 'PPT' || material.type === 'Presentation') {
+              ext = 'pptx';
+            }
+          }
+          
+          const fileName = `${material.title}-${material.type}.${ext}`;
+          const directUrl = `${apiBase}/materials/download-direct?file=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`;
+          await triggerDownload(directUrl, fileName);
         }
 
         if (onDownloadSuccess) {
@@ -479,6 +491,13 @@ export default function MaterialCard({
     );
   };
 
+  const hasCustomThumbnail = () => {
+    if (!material.thumbnail) return false;
+    if (material.thumbnail.includes('unsplash.com') || material.thumbnail.includes('placeholder.com')) return false;
+    if (material.thumbnail === material.fileUrl && (material.type === 'Reel' || material.type === 'Video')) return false;
+    return true;
+  };
+
   return (
     <div className="glass-effect rounded-2xl overflow-hidden border border-white/5 shadow-lg group hover:border-indigo-500/20 hover:shadow-indigo-500/5 transition-all duration-300">
       {/* Thumbnail Container (Click to Preview) */}
@@ -487,25 +506,41 @@ export default function MaterialCard({
         className="relative aspect-video w-full overflow-hidden bg-slate-950 cursor-pointer group/thumb"
       >
         { (material.type === 'Reel' || material.type === 'Video') ? (
-          <video
-            src={material.fileUrl}
-            muted
-            playsInline
-            preload="none"
-            className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
-            onMouseEnter={e => e.target.play().catch(err => {})}
-            onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0; }}
-          />
+          hasCustomThumbnail() ? (
+            <img
+              src={material.thumbnail}
+              alt={material.title}
+              className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <video
+              src={material.fileUrl}
+              muted
+              playsInline
+              preload="none"
+              className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
+              onMouseEnter={e => e.target.play().catch(err => {})}
+              onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0; }}
+            />
+          )
         ) : (material.type === 'PDF' || material.type === 'Brochure' || material.type === 'PPT') ? (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-[#0d1326] border border-white/5 p-4 text-center group-hover/thumb:scale-105 transition-transform duration-500">
-            {material.type === 'PPT' ? (
-              <FileCheck className="text-orange-400 mb-1.5" size={36} />
-            ) : (
-              <FileText className="text-red-400 mb-1.5" size={36} />
-            )}
-            <span className="text-xs font-semibold text-gray-300 line-clamp-1 px-1">{material.title}</span>
-            <span className="text-[9px] text-gray-500 uppercase font-bold mt-1 tracking-wider">{material.type} Document</span>
-          </div>
+          hasCustomThumbnail() ? (
+            <img
+              src={material.thumbnail}
+              alt={material.title}
+              className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-[#0d1326] border border-white/5 p-4 text-center group-hover/thumb:scale-105 transition-transform duration-500">
+              {material.type === 'PPT' ? (
+                <FileCheck className="text-orange-400 mb-1.5" size={36} />
+              ) : (
+                <FileText className="text-red-400 mb-1.5" size={36} />
+              )}
+              <span className="text-xs font-semibold text-gray-300 line-clamp-1 px-1">{material.title}</span>
+              <span className="text-[9px] text-gray-500 uppercase font-bold mt-1 tracking-wider">{material.type} Document</span>
+            </div>
+          )
         ) : (
           <img
             src={material.thumbnail}

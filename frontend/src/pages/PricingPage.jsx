@@ -15,6 +15,11 @@ export default function PricingPage() {
   const [availableCategories, setAvailableCategories] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedAddons, setSelectedAddons] = useState([]);
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState('direct'); // 'trial' or 'direct'
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
+
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (selectedPlanForConfirmation) {
@@ -30,17 +35,24 @@ export default function PricingPage() {
   useEffect(() => {
     const fetchPlansAndCategories = async () => {
       try {
-        const [plansRes, subcatRes] = await Promise.all([
+        const [plansRes, catRes, subcatRes] = await Promise.all([
           API.get('/plans'),
+          API.get('/materials/categories'),
           API.get('/materials/subcategories')
         ]);
         if (plansRes.data.success) {
-          setPlans(plansRes.data.data.filter(p => p.isActive));
+          setPlans(plansRes.data.data.filter(p => p.isActive && p.name !== 'All Free'));
+        }
+        
+        let addonItems = [];
+        if (catRes.data.success) {
+           addonItems = [...addonItems, ...catRes.data.data.filter(c => c.isLeaderCategory)];
         }
         if (subcatRes.data.success) {
           // Only show Main Subcategories for selection
-          setAvailableCategories(subcatRes.data.data.filter(s => s.isMainSubcategory));
+          addonItems = [...addonItems, ...subcatRes.data.data.filter(s => s.isMainSubcategory)];
         }
+        setAvailableCategories(addonItems);
       } catch (err) {
         console.error('Error fetching data:', err);
       } finally {
@@ -65,10 +77,10 @@ export default function PricingPage() {
     } else {
       // Trying to select a new category
       
-      // If it's a leader category and plan doesn't include leader, they can't select it as base or addon (or maybe as addon? for now prevent)
+      // If it's a leader category and plan doesn't include leader, they can't select it as base, it MUST be an addon.
       if (isLeaderCat && !plan.isLeaderIncluded) {
-        alert("This is a Leader segment category. Please select a Leader or Combo plan.");
-        return;
+         setSelectedAddons(prev => [...prev, catId]);
+         return;
       }
 
       if (selectedCategories.length < plan.categoryCount) {
@@ -88,7 +100,20 @@ export default function PricingPage() {
       const cat = availableCategories.find(c => c._id === id);
       if (cat) addonsTotal += (cat.addonPrice || 1499);
     });
-    return Math.round((base + addonsTotal) * 1.18);
+    
+    let subtotal = base + addonsTotal;
+    let discount = 0;
+    if (appliedCoupon) {
+      if (appliedCoupon.discountType === 'PERCENTAGE') {
+        discount = (subtotal * appliedCoupon.discountValue) / 100;
+      } else {
+        discount = appliedCoupon.discountValue;
+      }
+      if (discount > subtotal) discount = subtotal;
+    }
+    
+    subtotal = subtotal - discount;
+    return Math.round(subtotal * 1.18);
   };
   
   const calculateGST = () => {
@@ -99,20 +124,74 @@ export default function PricingPage() {
       const cat = availableCategories.find(c => c._id === id);
       if (cat) addonsTotal += (cat.addonPrice || 1499);
     });
-    return Math.round((base + addonsTotal) * 0.18);
+    
+    let subtotal = base + addonsTotal;
+    let discount = 0;
+    if (appliedCoupon) {
+      if (appliedCoupon.discountType === 'PERCENTAGE') {
+        discount = (subtotal * appliedCoupon.discountValue) / 100;
+      } else {
+        discount = appliedCoupon.discountValue;
+      }
+      if (discount > subtotal) discount = subtotal;
+    }
+    
+    subtotal = subtotal - discount;
+    return Math.round(subtotal * 0.18);
+  };
+  
+  const calculateDiscount = () => {
+    if (!selectedPlanForConfirmation || !appliedCoupon) return 0;
+    let base = selectedPlanForConfirmation.price;
+    let addonsTotal = 0;
+    selectedAddons.forEach(id => {
+      const cat = availableCategories.find(c => c._id === id);
+      if (cat) addonsTotal += (cat.addonPrice || 1499);
+    });
+    
+    let subtotal = base + addonsTotal;
+    let discount = 0;
+    if (appliedCoupon.discountType === 'PERCENTAGE') {
+      discount = (subtotal * appliedCoupon.discountValue) / 100;
+    } else {
+      discount = appliedCoupon.discountValue;
+    }
+    if (discount > subtotal) discount = subtotal;
+    return discount;
+  };
+
+  const handleApplyCoupon = async () => {
+    setCouponError('');
+    if (!couponInput) return;
+    try {
+      const res = await API.post('/payments/validate-coupon', { code: couponInput });
+      if (res.data.success) {
+        setAppliedCoupon(res.data.data);
+      }
+    } catch (err) {
+      setAppliedCoupon(null);
+      setCouponError(err.response?.data?.error || 'Invalid coupon code');
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
   };
 
 
-  const handlePaymentClick = (plan) => {
+  const handlePaymentClick = (plan, mode) => {
     if (!user) {
       window.alert('Please login to purchase a plan.');
       navigate('/login');
       return;
     }
     setSelectedPlanForConfirmation(plan);
+    setSelectedPaymentMode(mode);
   };
 
-  const processPayment = async (plan) => {
+  const processTrialPayment = async (plan) => {
     if (selectedCategories.length < plan.categoryCount && availableCategories.length >= plan.categoryCount) {
        if(!window.confirm(`You haven't selected all your ${plan.categoryCount} free categories. Proceed anyway?`)) {
            return;
@@ -129,7 +208,8 @@ export default function PricingPage() {
       // 1. Create Subscription
       const subRes = await API.post('/payments/create-subscription', { 
         planId: plan._id,
-        selectedAddons: addonsToSubmit
+        selectedAddons: addonsToSubmit,
+        couponCode: appliedCoupon?.code
       });
       if (!subRes.data.success) throw new Error('Subscription creation failed');
       
@@ -150,7 +230,8 @@ export default function PricingPage() {
               razorpay_signature: response.razorpay_signature,
               planId: plan._id,
               selectedCategories: catsToSubmit,
-              selectedAddons: addonsToSubmit
+              selectedAddons: addonsToSubmit,
+              couponCode: appliedCoupon?.code
             });
 
             if (verifyRes.data.success) {
@@ -175,6 +256,90 @@ export default function PricingPage() {
 
       if (!window.Razorpay) {
         window.alert('Payment gateway failed to load. Please check your internet connection or disable AdBlocker.');
+        return;
+      }
+
+      const rzp1 = new window.Razorpay(options);
+      rzp1.on('payment.failed', function (response){
+        console.error(response.error);
+        window.alert('Payment Failed: ' + response.error.description);
+      });
+      rzp1.open();
+
+    } catch (err) {
+      console.error('Payment error:', err);
+      window.alert('Could not initiate payment. Please try again.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const processDirectPayment = async (plan) => {
+    if (selectedCategories.length < plan.categoryCount && availableCategories.length >= plan.categoryCount) {
+       if(!window.confirm(`You haven't selected all your ${plan.categoryCount} free categories. Proceed anyway?`)) {
+           return;
+       }
+    }
+
+    const catsToSubmit = selectedCategories;
+    const addonsToSubmit = selectedAddons;
+    
+    setSelectedPlanForConfirmation(null);
+    setProcessingId(plan._id);
+    try {
+      // 1. Create Direct Order
+      const orderRes = await API.post('/payments/create-order', { 
+        planId: plan._id,
+        selectedAddons: addonsToSubmit,
+        couponCode: appliedCoupon?.code
+      });
+      if (!orderRes.data.success) throw new Error('Order creation failed');
+      
+      const { data: orderData, key } = orderRes.data;
+
+      // 2. Open Razorpay Checkout for Immediate Payment
+      const options = {
+        key: key,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'Policybhandar',
+        description: `${plan.name} - Buy Now`,
+        order_id: orderData.id,
+        handler: async function (response) {
+          try {
+            // 3. Verify Payment
+            const verifyRes = await API.post('/payments/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              planId: plan._id,
+              selectedCategories: catsToSubmit,
+              selectedAddons: addonsToSubmit,
+              couponCode: appliedCoupon?.code
+            });
+
+            if (verifyRes.data.success) {
+              await fetchUser();
+              window.alert('Payment successful! Plan upgraded.');
+              navigate('/category/all');
+            }
+          } catch (err) {
+            console.error('Verification error:', err);
+            window.alert('Payment verification failed.');
+          }
+        },
+        prefill: {
+          name: user.name,
+          email: user.email,
+          contact: user.mobile || '9999999999'
+        },
+        theme: {
+          color: '#f97316'
+        }
+      };
+
+      if (!window.Razorpay) {
+        window.alert('Payment gateway failed to load.');
         return;
       }
 
@@ -220,7 +385,7 @@ export default function PricingPage() {
         </p>
       </div>
 
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12 items-center relative z-10">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 gap-y-16 lg:gap-12 lg:gap-y-20 items-stretch relative z-10">
         {plans.map((plan, index) => {
           const isPopular = index === 1 || plan.price > 1000;
           return (
@@ -291,23 +456,31 @@ export default function PricingPage() {
                 )}
               </div>
 
-              <button 
-                onClick={() => handlePaymentClick(plan)}
-                disabled={processingId === plan._id}
-                className={`relative z-10 w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
-                isPopular 
-                  ? 'bg-gradient-premium hover:bg-gradient-premium-hover text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.02]' 
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
-              } disabled:opacity-70 disabled:scale-100`}>
-                <span className="relative z-10 flex items-center gap-2">
-                  {processingId === plan._id ? (
-                    <span className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                  ) : (
-                    <Zap size={16} className={isPopular ? "text-amber-300" : "text-slate-500"} fill={isPopular ? "currentColor" : "none"} />
-                  )}
-                  {processingId === plan._id ? 'Processing...' : 'Get Started Now'}
-                </span>
-              </button>
+              <div className="flex flex-col gap-3 relative z-10 w-full mt-auto">
+                <button 
+                  onClick={() => handlePaymentClick(plan, 'trial')}
+                  disabled={processingId === plan._id}
+                  className={`flex-1 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer border-2 ${
+                    isPopular 
+                      ? 'bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100 hover:border-orange-300' 
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  } disabled:opacity-70`}
+                >
+                  <Zap size={14} fill="currentColor" /> Free Trial
+                </button>
+                
+                <button 
+                  onClick={() => handlePaymentClick(plan, 'direct')}
+                  disabled={processingId === plan._id}
+                  className={`flex-1 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                    isPopular 
+                      ? 'bg-gradient-premium hover:bg-gradient-premium-hover text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30' 
+                      : 'bg-slate-800 hover:bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/30'
+                  } disabled:opacity-70`}
+                >
+                  <Zap size={14} fill="currentColor" /> Buy Now
+                </button>
+              </div>
             </div>
           );
         })}
@@ -367,6 +540,39 @@ export default function PricingPage() {
               </div>
             </div>
 
+            {/* Coupon Code Section */}
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Have a coupon code?</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Enter code" 
+                  value={couponInput}
+                  onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                  disabled={!!appliedCoupon}
+                  className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold uppercase text-slate-900 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 disabled:bg-slate-100 disabled:text-slate-500"
+                />
+                {!appliedCoupon ? (
+                  <button 
+                    onClick={handleApplyCoupon}
+                    disabled={!couponInput || !!appliedCoupon}
+                    className="bg-orange-500 text-white px-5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-colors disabled:opacity-50"
+                  >
+                    Apply
+                  </button>
+                ) : (
+                  <button 
+                    onClick={removeCoupon}
+                    className="bg-red-50 text-red-600 px-5 rounded-xl font-bold text-sm hover:bg-red-100 border border-red-200 transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {couponError && <p className="text-red-500 text-xs font-bold mt-2">{couponError}</p>}
+              {appliedCoupon && <p className="text-emerald-600 text-xs font-bold mt-2 flex items-center gap-1"><Check size={14}/> Coupon applied successfully!</p>}
+            </div>
+
             <div className="space-y-3 mb-8 bg-slate-50 p-5 rounded-2xl border border-slate-100">
               <div className="flex justify-between text-slate-600 font-medium">
                 <span>{selectedPlanForConfirmation.name} Plan:</span>
@@ -383,6 +589,12 @@ export default function PricingPage() {
                   }</span>
                 </div>
               )}
+              {appliedCoupon && (
+                <div className="flex justify-between text-emerald-600 font-medium">
+                  <span>Discount ({appliedCoupon.code}):</span>
+                  <span>-₹{calculateDiscount()}</span>
+                </div>
+              )}
               <div className="flex justify-between text-slate-600 font-medium pb-4 border-b border-slate-200">
                 <span>GST (18%):</span>
                 <span>₹{calculateGST()}</span>
@@ -393,12 +605,27 @@ export default function PricingPage() {
               </div>
             </div>
 
-            <button 
-              onClick={() => processPayment(selectedPlanForConfirmation)}
-              className="w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white bg-gradient-premium hover:bg-gradient-premium-hover shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300 flex items-center justify-center gap-2"
-            >
-              <Zap size={18} fill="currentColor" /> Start 15 Days Free Trial
-            </button>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => selectedPaymentMode === 'trial' ? processTrialPayment(selectedPlanForConfirmation) : processDirectPayment(selectedPlanForConfirmation)}
+                disabled={processingId === selectedPlanForConfirmation._id}
+                className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 ${
+                  selectedPaymentMode === 'trial'
+                    ? 'text-orange-600 bg-orange-50 border-2 border-orange-200 hover:bg-orange-100'
+                    : 'text-white bg-gradient-premium hover:bg-gradient-premium-hover shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30'
+                } disabled:opacity-70`}
+              >
+                {processingId === selectedPlanForConfirmation._id ? (
+                  <span className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <Zap size={18} fill="currentColor" />
+                )}
+                {processingId === selectedPlanForConfirmation._id 
+                  ? 'Processing...' 
+                  : selectedPaymentMode === 'trial' ? 'Start 15 Days Free Trial (Auto-pay)' : 'Confirm & Buy Now'
+                }
+              </button>
+            </div>
           </div>
         </div>,
         document.body

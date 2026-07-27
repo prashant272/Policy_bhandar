@@ -2,6 +2,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const Plan = require('../models/Plan');
 const User = require('../models/User');
+const Coupon = require('../models/Coupon');
 
 // Initialize Razorpay with fallback dummy keys if env is not set
 const razorpay = new Razorpay({
@@ -9,12 +10,46 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummysecret123'
 });
 
+// @desc    Validate a coupon code
+// @route   POST /api/payments/validate-coupon
+// @access  Private
+exports.validateCoupon = async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'Coupon code is required' });
+    }
+
+    const coupon = await Coupon.findOne({ code: code.toUpperCase() });
+    
+    if (!coupon) {
+      return res.status(404).json({ success: false, error: 'Invalid coupon code' });
+    }
+
+    if (!coupon.isActive) {
+      return res.status(400).json({ success: false, error: 'This coupon is no longer active' });
+    }
+
+    if (coupon.expiryDate && new Date() > coupon.expiryDate) {
+      return res.status(400).json({ success: false, error: 'This coupon has expired' });
+    }
+
+    if (coupon.maxUses > 0 && coupon.currentUses >= coupon.maxUses) {
+      return res.status(400).json({ success: false, error: 'This coupon usage limit has been reached' });
+    }
+
+    res.status(200).json({ success: true, data: coupon });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 // @desc    Create Razorpay Order
 // @route   POST /api/payments/create-order
 // @access  Private
 exports.createOrder = async (req, res) => {
   try {
-    const { planId, selectedAddons } = req.body;
+    const { planId, selectedAddons, couponCode } = req.body;
     
     if (!planId) {
       return res.status(400).json({ success: false, error: 'Plan ID is required' });
@@ -31,13 +66,43 @@ exports.createOrder = async (req, res) => {
     // Calculate addon prices if any
     if (selectedAddons && Array.isArray(selectedAddons) && selectedAddons.length > 0) {
       const Category = require('../models/Category');
-      const addons = await Category.find({ _id: { $in: selectedAddons } });
-      addons.forEach(addon => {
+      const Subcategory = require('../models/Subcategory');
+      
+      const addonCats = await Category.find({ _id: { $in: selectedAddons } });
+      const addonSubcats = await Subcategory.find({ _id: { $in: selectedAddons } });
+      
+      const allAddons = [...addonCats, ...addonSubcats];
+      allAddons.forEach(addon => {
         addonsPrice += addon.addonPrice || 1499;
       });
     }
 
-    const finalPrice = Math.round((basePrice + addonsPrice) * 1.18);
+    let subtotal = basePrice + addonsPrice;
+    
+    // Apply discount if a valid coupon is provided
+    let discountAmount = 0;
+    if (couponCode) {
+      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
+      if (coupon) {
+        const isNotExpired = !coupon.expiryDate || new Date() <= coupon.expiryDate;
+        const isUnderLimit = coupon.maxUses === 0 || coupon.currentUses < coupon.maxUses;
+        
+        if (isNotExpired && isUnderLimit) {
+          if (coupon.discountType === 'PERCENTAGE') {
+            discountAmount = (subtotal * coupon.discountValue) / 100;
+          } else if (coupon.discountType === 'FLAT') {
+            discountAmount = coupon.discountValue;
+          }
+          // Ensure discount doesn't exceed subtotal
+          if (discountAmount > subtotal) {
+            discountAmount = subtotal;
+          }
+        }
+      }
+    }
+    
+    subtotal = subtotal - discountAmount;
+    const finalPrice = Math.round(subtotal * 1.18);
 
     // Amount should be in paise
     const options = {
@@ -65,7 +130,7 @@ exports.createOrder = async (req, res) => {
 // @access  Private
 exports.verifyPayment = async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId, selectedCategories, selectedAddons } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId, selectedCategories, selectedAddons, couponCode } = req.body;
 
     const secret = process.env.RAZORPAY_KEY_SECRET || 'dummysecret123';
 
@@ -112,6 +177,13 @@ exports.verifyPayment = async (req, res) => {
 
     await user.save();
 
+    if (couponCode) {
+      await Coupon.findOneAndUpdate(
+        { code: couponCode.toUpperCase() },
+        { $inc: { currentUses: 1 } }
+      );
+    }
+
     res.status(200).json({ success: true, message: 'Payment verified and plan upgraded successfully' });
   } catch (err) {
     console.error('Error verifying payment:', err);
@@ -124,7 +196,7 @@ exports.verifyPayment = async (req, res) => {
 // @access  Private
 exports.createSubscription = async (req, res) => {
   try {
-    const { planId, selectedAddons } = req.body;
+    const { planId, selectedAddons, couponCode } = req.body;
     
     if (!planId) {
       return res.status(400).json({ success: false, error: 'Plan ID is required' });
@@ -138,16 +210,42 @@ exports.createSubscription = async (req, res) => {
     // Calculate total including addons
     let addonsTotal = 0;
     if (selectedAddons && selectedAddons.length > 0) {
-      // Import Subcategory at top of file (or use mongoose model) if not imported, 
-      // but assuming Subcategory is required. Let's just require it here if needed.
+      const Category = require('../models/Category');
       const Subcategory = require('../models/Subcategory');
-      for (const id of selectedAddons) {
-        const subcat = await Subcategory.findById(id);
-        if (subcat) addonsTotal += (subcat.addonPrice || 1499);
+      
+      const addonCats = await Category.find({ _id: { $in: selectedAddons } });
+      const addonSubcats = await Subcategory.find({ _id: { $in: selectedAddons } });
+      
+      const allAddons = [...addonCats, ...addonSubcats];
+      allAddons.forEach(addon => {
+        addonsTotal += addon.addonPrice || 1499;
+      });
+    }
+    
+    let subtotal = plan.price + addonsTotal;
+    
+    // Apply discount if a valid coupon is provided
+    let discountAmount = 0;
+    if (couponCode) {
+      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
+      if (coupon) {
+        const isNotExpired = !coupon.expiryDate || new Date() <= coupon.expiryDate;
+        const isUnderLimit = coupon.maxUses === 0 || coupon.currentUses < coupon.maxUses;
+        
+        if (isNotExpired && isUnderLimit) {
+          if (coupon.discountType === 'PERCENTAGE') {
+            discountAmount = (subtotal * coupon.discountValue) / 100;
+          } else if (coupon.discountType === 'FLAT') {
+            discountAmount = coupon.discountValue;
+          }
+          if (discountAmount > subtotal) {
+            discountAmount = subtotal;
+          }
+        }
       }
     }
     
-    const finalPrice = plan.price + addonsTotal;
+    const finalPrice = subtotal - discountAmount;
     let finalRzpPlanId;
 
     let period = 'monthly';
@@ -228,7 +326,7 @@ exports.createSubscription = async (req, res) => {
 // @access  Private
 exports.verifySubscription = async (req, res) => {
   try {
-    const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature, planId, selectedCategories, selectedAddons } = req.body;
+    const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature, planId, selectedCategories, selectedAddons, couponCode } = req.body;
     const secret = process.env.RAZORPAY_KEY_SECRET || 'dummysecret123';
 
     // Verify signature
@@ -278,7 +376,14 @@ exports.verifySubscription = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ success: true, message: 'Subscription activated successfully' });
+    if (couponCode) {
+      await Coupon.findOneAndUpdate(
+        { code: couponCode.toUpperCase() },
+        { $inc: { currentUses: 1 } }
+      );
+    }
+
+    res.status(200).json({ success: true, message: 'Subscription verified and plan upgraded successfully' });
   } catch (err) {
     console.error('Error verifying subscription:', err);
     res.status(500).json({ success: false, error: err.message || 'Could not verify subscription' });

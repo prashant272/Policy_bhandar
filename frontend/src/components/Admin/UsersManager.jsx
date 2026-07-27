@@ -135,6 +135,7 @@ export default function UsersManager() {
                 <th className="p-4 whitespace-nowrap">Location</th>
                 <th className="p-4 whitespace-nowrap">System Role</th>
                 <th className="p-4 whitespace-nowrap">Subscription Plan</th>
+                <th className="p-4 whitespace-nowrap">Unlocked Categories</th>
                 <th className="p-4 text-center whitespace-nowrap">Downloads Today</th>
                 <th className="p-4 text-center whitespace-nowrap">Actions</th>
               </tr>
@@ -175,11 +176,60 @@ export default function UsersManager() {
                       ))}
                     </select>
                   </td>
+                  <td className="p-4">
+                    {(() => {
+                      const planId = typeof usr.activePlan === 'object' ? usr.activePlan?._id : usr.activePlan;
+                      const plan = plansList.find(p => p._id === planId);
+                      if (plan && plan.name === 'All Free') {
+                        return <span className="bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded text-[10px] font-bold">Full Access (All Free)</span>;
+                      }
+                      
+                      const cats = [...(usr.unlockedCategories || []), ...(usr.purchasedAddons || [])];
+                      if (cats.length === 0) return <span className="text-gray-600">-</span>;
+                      
+                      // Remove duplicates by ID and map to name
+                      const uniqueCatsMap = new Map();
+                      cats.forEach(c => {
+                        const id = typeof c === 'object' ? c._id?.toString() : c.toString();
+                        const name = typeof c === 'object' ? c.name : 'Unknown';
+                        if (id && !uniqueCatsMap.has(id)) uniqueCatsMap.set(id, name);
+                      });
+                      
+                      const uniqueCats = Array.from(uniqueCatsMap.values());
+                      
+                      return (
+                        <div className="flex flex-wrap gap-1 max-w-[150px]">
+                          {uniqueCats.map((name, i) => (
+                            <span key={i} className="bg-white/5 border border-white/10 text-gray-300 px-2 py-0.5 rounded text-[10px] truncate" title={name}>
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td className="p-4 text-center font-bold text-gray-400">
-                    <span className={usr.downloadCount >= 5 ? 'text-red-400' : 'text-emerald-400'}>
-                      {usr.downloadCount}
-                    </span>
-                    <span className="text-gray-600 font-normal"> / 5</span>
+                    {(() => {
+                      const limit = (() => {
+                        if (!usr.activePlan) return 5;
+                        const planId = typeof usr.activePlan === 'object' ? usr.activePlan._id : usr.activePlan;
+                        const plan = plansList.find(p => p._id === planId);
+                        if (!plan) return 5;
+                        return plan.dailyDownloadLimit;
+                      })();
+                      const isUnlimited = limit === -1;
+                      const limitReached = !isUnlimited && usr.downloadCount >= limit;
+                      return (
+                        <>
+                          <span className={limitReached ? 'text-red-400' : 'text-emerald-400'}>
+                            {usr.downloadCount}
+                          </span>
+                          <span className="text-gray-600 font-normal">
+                            {isUnlimited ? ' / ∞' : ` / ${limit}`}
+                          </span>
+                        </>
+                      );
+                    })()}
                   </td>
                   <td className="p-4 text-center">
                     <div className="flex justify-center items-center space-x-2">
@@ -195,12 +245,12 @@ export default function UsersManager() {
               ))}
               {usersList.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="8" className="p-8 text-center text-gray-500">No advisors registered in the database yet.</td>
+                  <td colSpan="9" className="p-8 text-center text-gray-500">No advisors registered in the database yet.</td>
                 </tr>
               )}
               {loading && (
                 <tr>
-                  <td colSpan="8" className="p-8 text-center text-indigo-400 font-semibold animate-pulse">Loading advisors dataset...</td>
+                  <td colSpan="9" className="p-8 text-center text-indigo-400 font-semibold animate-pulse">Loading advisors dataset...</td>
                 </tr>
               )}
             </tbody>

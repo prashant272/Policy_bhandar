@@ -27,4 +27,6 @@ const CategorySchema = new mongoose.Schema({
   timestamps: true
 });
 
+CategorySchema.index({ isLeaderCategory: 1 });
+
 module.exports = mongoose.model('Category', CategorySchema);

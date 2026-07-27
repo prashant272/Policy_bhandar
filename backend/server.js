@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
+const compression = require('compression');
 const connectDB = require('./config/db');
 
 // Load env vars
@@ -18,8 +19,14 @@ app.use(express.json());
 // Enable CORS
 app.use(cors());
 
-// Serve static upload files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Enable payload compression
+app.use(compression());
+
+// Serve static upload files with caching (7 days)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '7d',
+  immutable: true
+}));
 
 // Mount routers
 app.use('/api/auth', require('./routes/authRoutes'));

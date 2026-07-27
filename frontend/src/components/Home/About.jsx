@@ -4,14 +4,14 @@ import { ArrowRight, ShieldCheck, BookOpen, Users, Award, Sparkles, Quote, Check
 export default function About() {
   const slides = [
     {
-      url: '/founder.webp',
-      fallback: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=600',
+      url: '/founder-new-1.jpg',
+      fallback: '/founder.webp',
       label: 'Mr. Yogendra Verma (Founder)',
-      subtitle: '16+ Years Experience'
+      subtitle: '28+ Years Experience'
     },
     {
-      url: '/founter2.webp',
-      fallback: 'https://images.unsplash.com/photo-1552581230-c01bc0d4629d?auto=format&fit=crop&q=80&w=600',
+      url: '/founder-new-2.jpg',
+      fallback: '/founter2.webp',
       label: 'Elite Advisor Training & Guidance',
       subtitle: 'Trained Thousands Across India'
     }
@@ -77,7 +77,7 @@ export default function About() {
             </h3>
             <p className="text-sm font-semibold text-orange-600 flex items-center gap-1.5">
               <Award size={16} />
-              <span>Insurance Expert & Visionary Leader (16+ Years Experience)</span>
+              <span>Insurance Expert & Visionary Leader </span>
             </p>
           </div>
 
@@ -85,16 +85,16 @@ export default function About() {
           <div className="relative p-5 rounded-2xl bg-gradient-to-r from-orange-50/50 to-amber-50/50 border border-orange-100/50 my-4">
             <Quote className="absolute top-4 right-4 text-orange-500/10 w-12 h-12 pointer-events-none" />
             <p className="text-sm text-slate-700 font-bold italic leading-relaxed relative z-10">
-              "Policy Bhandar was founded with a single, powerful mission: to impart deep insurance knowledge and premium professional training to maximum people in the Insurance Marketing Field force, helping them scale greater heights."
+              "Empower Advisors with Knowledge, Technology, and Digital Marketing so they can build a bigger business while serving their clients professionally."
             </p>
           </div>
 
           <div className="space-y-3 text-sm text-slate-500 leading-relaxed font-medium">
             <p>
-              In a short span of fewer than 5 years, Policy Bhandar has successfully trained thousands of insurance advisors across India on a yearly basis, establishing itself as a premier destination for advisor development and financial success.
+              With over <strong className="text-slate-800">28 years of experience</strong>, Mr. Yogendra Verma has dedicated his career to helping Insurance Advisors, Mutual Fund Advisors, and Business Leaders build sustainable, profitable, and long-term businesses.
             </p>
             <p>
-              Under the veteran leadership of Mr. Verma, we aim to bridge the gap between traditional advisor channels and modern digital marketing methodologies, giving every advisor the absolute competitive advantage they need.
+              Policy Bhandar is a <strong className="text-slate-800">Complete Business Growth Ecosystem</strong> bridging the gap between traditional selling and modern digital business building. It provides professional marketing materials, AI reels, and recruitment tools all in one mobile-first platform.
             </p>
           </div>
 

@@ -60,4 +60,10 @@ const MaterialSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Indexes for query optimization
+MaterialSchema.index({ categoryId: 1, subcategoryId: 1, type: 1 });
+MaterialSchema.index({ categoryId: 1, type: 1 });
+MaterialSchema.index({ isPremium: 1 });
+MaterialSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Material', MaterialSchema);

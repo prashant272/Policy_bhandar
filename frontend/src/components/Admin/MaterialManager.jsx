@@ -138,6 +138,7 @@ export default function MaterialManager() {
   // Edit / Form States
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedThumbnail, setSelectedThumbnail] = useState(null);
   
   const [materialForm, setMaterialForm] = useState({
     title: '',
@@ -289,8 +290,13 @@ export default function MaterialManager() {
 
       if (selectedFile) {
         formData.append('file', selectedFile);
-      } else {
+      } else if (materialForm.fileUrl) {
         formData.append('fileUrl', materialForm.fileUrl);
+      }
+
+      if (selectedThumbnail) {
+        formData.append('thumbnail', selectedThumbnail);
+      } else if (materialForm.thumbnail) {
         formData.append('thumbnail', materialForm.thumbnail);
       }
 
@@ -362,6 +368,7 @@ export default function MaterialManager() {
   const resetForm = () => {
     setEditingMaterial(null);
     setSelectedFile(null);
+    setSelectedThumbnail(null);
     setMaterialForm({
       title: '',
       categoryId: categories[0]?._id || '',
@@ -689,11 +696,21 @@ export default function MaterialManager() {
               <div className="space-y-4">
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Choose File Source</label>
                 <div className="flex flex-col md:flex-row gap-4 items-center">
-                  <input
-                    type="file"
-                    onChange={e => setSelectedFile(e.target.files[0])}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4 text-xs text-gray-300 file:bg-indigo-600 file:border-0 file:rounded file:text-white file:px-3 file:py-1 file:mr-4 file:font-semibold cursor-pointer"
-                  />
+                  <div className="w-full space-y-2">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase">Main File</label>
+                    <input
+                      type="file"
+                      onChange={e => setSelectedFile(e.target.files[0])}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4 text-xs text-gray-300 file:bg-indigo-600 file:border-0 file:rounded file:text-white file:px-3 file:py-1 file:mr-4 file:font-semibold cursor-pointer"
+                    />
+                    <label className="text-[10px] text-gray-500 font-bold uppercase">Custom Thumbnail (Optional)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => setSelectedThumbnail(e.target.files[0])}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4 text-xs text-gray-300 file:bg-indigo-600 file:border-0 file:rounded file:text-white file:px-3 file:py-1 file:mr-4 file:font-semibold cursor-pointer"
+                    />
+                  </div>
                   <span className="text-xs text-gray-500 font-bold">OR</span>
                   <div className="flex-1 w-full space-y-2">
                     <input
@@ -709,7 +726,7 @@ export default function MaterialManager() {
                       placeholder={editingMaterial ? "Keep empty or paste new Thumbnail URL" : "Paste Remote Thumbnail URL"}
                       value={materialForm.thumbnail}
                       onChange={e => setMaterialForm({ ...materialForm, thumbnail: e.target.value })}
-                      disabled={!!selectedFile}
+                      disabled={!!selectedThumbnail || !!selectedFile}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4 text-xs text-white disabled:opacity-30 focus:outline-none focus:border-indigo-500"
                     />
                   </div>

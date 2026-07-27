@@ -9,6 +9,7 @@ import WatermarkManager from '../components/Admin/WatermarkManager';
 import TrainingManager from '../components/Admin/TrainingManager';
 import PlanManager from '../components/Admin/PlanManager';
 import LeadsManager from '../components/Admin/LeadsManager';
+import CouponManager from '../components/Admin/CouponManager';
 
 export default function AdminDashboard() {
   const { user, logout } = useContext(AuthContext);
@@ -32,6 +33,8 @@ export default function AdminDashboard() {
         return <PlanManager />;
       case 'leads':
         return <LeadsManager />;
+      case 'coupons':
+        return <CouponManager />;
       default:
         return <CategoryManager />;
     }

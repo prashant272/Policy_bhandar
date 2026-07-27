@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderTree, LayoutGrid, Users, LogOut, ShieldAlert, MessageSquare, Mail } from 'lucide-react';
+import { FolderTree, LayoutGrid, Users, LogOut, ShieldAlert, MessageSquare, Mail, Tag } from 'lucide-react';
 
 export default function AdminSidebar({ activeTab, setActiveTab, user, onLogout }) {
   const menuItems = [
@@ -10,7 +10,10 @@ export default function AdminSidebar({ activeTab, setActiveTab, user, onLogout }
     { id: 'plans', label: 'Pricing Plans', icon: <FolderTree size={18} /> },
     { id: 'testimonials', label: 'Testimonials', icon: <MessageSquare size={18} /> },
     { id: 'leads', label: 'Leads & Inquiries', icon: <Mail size={18} /> },
-    ...(user?.role === 'SuperAdmin' ? [{ id: 'users', label: 'Users & Subscriptions', icon: <Users size={18} /> }] : [])
+    ...(user?.role === 'SuperAdmin' ? [
+      { id: 'coupons', label: 'Coupons & Discounts', icon: <Tag size={18} /> },
+      { id: 'users', label: 'Users & Subscriptions', icon: <Users size={18} /> }
+    ] : [])
   ];
 
   return (

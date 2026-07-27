@@ -66,11 +66,14 @@ exports.uploadMaterial = async (req, res) => {
     let fileUrl = req.body.fileUrl;
     let thumbnail = req.body.thumbnail;
 
-    if (req.file) {
+    let mainFile = req.files && req.files.file ? req.files.file[0] : (req.file ? req.file : null);
+    let thumbFile = req.files && req.files.thumbnail ? req.files.thumbnail[0] : null;
+
+    if (mainFile) {
       // Multer file upload to Cloudflare R2 or local filesystem fallback
-      fileUrl = await uploadFile(req.file);
+      fileUrl = await uploadFile(mainFile);
       // In a real app, generate thumbnails. For MVP, use fileUrl if it is an image
-      if (req.file.mimetype.startsWith('image/') && !req.file.mimetype.includes('svg')) {
+      if (mainFile.mimetype.startsWith('image/') && !mainFile.mimetype.includes('svg')) {
         thumbnail = fileUrl;
       } else {
         if (type === 'PPT') {
@@ -83,6 +86,10 @@ exports.uploadMaterial = async (req, res) => {
           thumbnail = fileUrl;
         }
       }
+    }
+
+    if (thumbFile) {
+      thumbnail = await uploadFile(thumbFile);
     }
 
     if (!fileUrl) {
@@ -129,7 +136,11 @@ exports.uploadMaterial = async (req, res) => {
 // @access  Private (SuperAdmin)
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.find().sort({ createdAt: -1 });
+    const users = await User.find()
+      .populate('activePlan')
+      .populate('unlockedCategories', 'name')
+      .populate('purchasedAddons', 'name')
+      .sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: users });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -170,6 +181,11 @@ exports.updateUser = async (req, res) => {
           const expiry = new Date();
           expiry.setDate(expiry.getDate() + (planDoc.validityDays || 30));
           user.planExpiryDate = expiry;
+          
+          // If a plan is assigned from admin, mark user as verified so they can login
+          user.isVerified = true;
+          user.otp = undefined;
+          user.otpExpires = undefined;
         }
       }
     }
@@ -297,26 +313,22 @@ exports.updateMaterial = async (req, res) => {
       updateData.tags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : tags;
     }
 
-    if (req.file) {
-      updateData.fileUrl = await uploadFile(req.file);
-      if (req.file.mimetype.startsWith('image/') && !req.file.mimetype.includes('svg')) {
+    let mainFile = req.files && req.files.file ? req.files.file[0] : (req.file ? req.file : null);
+    let thumbFile = req.files && req.files.thumbnail ? req.files.thumbnail[0] : null;
+
+    if (mainFile) {
+      updateData.fileUrl = await uploadFile(mainFile);
+      // Update thumbnail logic if type is image
+      if (mainFile.mimetype.startsWith('image/') && !mainFile.mimetype.includes('svg')) {
         updateData.thumbnail = updateData.fileUrl;
-      } else {
-        if (type === 'PPT') {
-          updateData.thumbnail = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=400';
-        } else if (type === 'PDF' || type === 'Brochure') {
-          updateData.thumbnail = 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=400';
-        } else if (type === 'Reel' || type === 'Video') {
-          updateData.thumbnail = 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=400';
-        } else {
-          updateData.thumbnail = updateData.fileUrl;
-        }
       }
-    } else {
-      if (fileUrl) updateData.fileUrl = fileUrl;
-      if (thumbnail) {
-        updateData.thumbnail = thumbnail;
-      } else if (!material.thumbnail || material.thumbnail === 'https://via.placeholder.com/150' || material.thumbnail === material.fileUrl) {
+    }
+
+    if (thumbFile) {
+      updateData.thumbnail = await uploadFile(thumbFile);
+    } else if (thumbnail) {
+      updateData.thumbnail = thumbnail;
+    } else if (!material.thumbnail || material.thumbnail === 'https://via.placeholder.com/150' || material.thumbnail === material.fileUrl) {
         // If updating type without a thumbnail, or the old thumbnail was just the file url of a non-image file, update it to a proper default
         if (type === 'PPT') {
           updateData.thumbnail = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=400';
@@ -325,7 +337,6 @@ exports.updateMaterial = async (req, res) => {
         } else if (type === 'Reel' || type === 'Video') {
           updateData.thumbnail = 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=400';
         }
-      }
     }
 
     material = await Material.findByIdAndUpdate(req.params.id, updateData, { new: true });
@@ -467,6 +478,68 @@ exports.updateSubcategory = async (req, res) => {
 
     await subcategory.save();
     res.status(200).json({ success: true, data: subcategory });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const Coupon = require('../models/Coupon');
+
+// @desc    Get all coupons
+// @route   GET /api/admin/coupons
+// @access  Private (SuperAdmin)
+exports.getCoupons = async (req, res) => {
+  try {
+    const coupons = await Coupon.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: coupons });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Create coupon
+// @route   POST /api/admin/coupons
+// @access  Private (SuperAdmin)
+exports.createCoupon = async (req, res) => {
+  try {
+    const coupon = await Coupon.create(req.body);
+    res.status(201).json({ success: true, data: coupon });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ success: false, error: 'Coupon code already exists' });
+    }
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Update coupon
+// @route   PUT /api/admin/coupons/:id
+// @access  Private (SuperAdmin)
+exports.updateCoupon = async (req, res) => {
+  try {
+    const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+    if (!coupon) {
+      return res.status(404).json({ success: false, error: 'Coupon not found' });
+    }
+    res.status(200).json({ success: true, data: coupon });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Delete coupon
+// @route   DELETE /api/admin/coupons/:id
+// @access  Private (SuperAdmin)
+exports.deleteCoupon = async (req, res) => {
+  try {
+    const coupon = await Coupon.findByIdAndDelete(req.params.id);
+    if (!coupon) {
+      return res.status(404).json({ success: false, error: 'Coupon not found' });
+    }
+    res.status(200).json({ success: true, data: {} });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

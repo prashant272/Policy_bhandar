@@ -15,7 +15,7 @@ const downloadJobs = {};
 // @access  Public
 exports.getCategories = async (req, res) => {
   try {
-    const categories = await Category.find();
+    const categories = await Category.find().lean();
     res.status(200).json({
       success: true,
       data: categories
@@ -33,7 +33,7 @@ exports.getCategories = async (req, res) => {
 // @access  Public
 exports.getSubcategories = async (req, res) => {
   try {
-    const subcategories = await Subcategory.find({ categoryId: req.params.categoryId });
+    const subcategories = await Subcategory.find({ categoryId: req.params.categoryId }).lean();
     res.status(200).json({
       success: true,
       data: subcategories
@@ -51,7 +51,7 @@ exports.getSubcategories = async (req, res) => {
 // @access  Public
 exports.getAllSubcategories = async (req, res) => {
   try {
-    const subcategories = await Subcategory.find();
+    const subcategories = await Subcategory.find().lean();
     res.status(200).json({
       success: true,
       data: subcategories
@@ -125,15 +125,15 @@ exports.getMaterials = async (req, res) => {
       .populate('watermarkTemplateId')
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     // Fetch the latest watermark template to use as the default if none is set
-    const defaultTemplate = await WatermarkTemplate.findOne().sort({ createdAt: -1 });
+    const defaultTemplate = await WatermarkTemplate.findOne().sort({ createdAt: -1 }).lean();
 
-    const processedMaterials = materials.map(m => {
-      const obj = m.toObject();
+    const processedMaterials = materials.map(obj => {
       if (!obj.watermarkTemplateId && defaultTemplate) {
-        obj.watermarkTemplateId = defaultTemplate.toObject();
+        obj.watermarkTemplateId = defaultTemplate;
       }
       return obj;
     });
@@ -215,46 +215,49 @@ exports.downloadMaterial = async (req, res) => {
       if (user.activePlan) {
         limit = user.activePlan.dailyDownloadLimit;
 
-        // Access Check
-        const matCatId = material.categoryId?.toString();
-        const matSubCatId = material.subcategoryId?.toString();
-        
-        let isLeaderContent = false;
-        
-        if (matCatId) {
-          const category = await Category.findById(matCatId);
-          if (category && category.isLeaderCategory) isLeaderContent = true;
-        }
-        
-        if (matSubCatId && !isLeaderContent) {
-          const subcategory = await Subcategory.findById(matSubCatId);
-          if (subcategory && subcategory.isLeaderCategory) isLeaderContent = true;
-        }
-
-        // If it's a Leader category, check leader access
-        if (isLeaderContent && !user.hasLeaderAccess) {
-          return res.status(403).json({
-            success: false,
-            limitReached: true,
-            needsUpgrade: true,
-            error: 'Premium Content: This is Leader Segment content. Please upgrade to a Leader plan!'
-          });
-        }
-
-        // If it's not exclusively Leader content, check if it's unlocked via plan or addons
-        if (!isLeaderContent) {
-          const unlockedCats = user.unlockedCategories?.map(c => c.toString()) || [];
-          const addonCats = user.purchasedAddons?.map(c => c.toString()) || [];
+        // Bypass checks if plan is 'All Free'
+        if (user.activePlan.name !== 'All Free') {
+          // Access Check
+          const matCatId = material.categoryId?.toString();
+          const matSubCatId = material.subcategoryId?.toString();
           
-          const hasAccess = unlockedCats.includes(matCatId) || addonCats.includes(matCatId) || unlockedCats.includes(matSubCatId) || addonCats.includes(matSubCatId);
+          let isLeaderContent = false;
           
-          if (!hasAccess && user.role !== 'SuperAdmin' && user.role !== 'SubAdmin') {
+          if (matCatId) {
+            const category = await Category.findById(matCatId);
+            if (category && category.isLeaderCategory) isLeaderContent = true;
+          }
+          
+          if (matSubCatId && !isLeaderContent) {
+            const subcategory = await Subcategory.findById(matSubCatId);
+            if (subcategory && subcategory.isLeaderCategory) isLeaderContent = true;
+          }
+
+          // If it's a Leader category, check leader access
+          if (isLeaderContent && !user.hasLeaderAccess) {
             return res.status(403).json({
               success: false,
               limitReached: true,
               needsUpgrade: true,
-              error: 'Premium Content: You have not unlocked this category/subcategory. Please purchase an add-on or upgrade your plan!'
+              error: 'Premium Content: This is Leader Segment content. Please upgrade to a Leader plan!'
             });
+          }
+
+          // If it's not exclusively Leader content, check if it's unlocked via plan or addons
+          if (!isLeaderContent) {
+            const unlockedCats = user.unlockedCategories?.map(c => c.toString()) || [];
+            const addonCats = user.purchasedAddons?.map(c => c.toString()) || [];
+            
+            const hasAccess = unlockedCats.includes(matCatId) || addonCats.includes(matCatId) || unlockedCats.includes(matSubCatId) || addonCats.includes(matSubCatId);
+            
+            if (!hasAccess && user.role !== 'SuperAdmin' && user.role !== 'SubAdmin') {
+              return res.status(403).json({
+                success: false,
+                limitReached: true,
+                needsUpgrade: true,
+                error: 'Premium Content: You have not unlocked this category/subcategory. Please purchase an add-on or upgrade your plan!'
+              });
+            }
           }
         }
       } else if (user.subscriptionType !== 'Free') {

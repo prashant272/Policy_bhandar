@@ -12,6 +12,7 @@ import BlogsPage from './pages/BlogsPage';
 import BlogDetailPage from './pages/BlogDetailPage';
 import TrainingPage from './pages/TrainingPage';
 import PricingPage from './pages/PricingPage';
+import AboutPage from './pages/AboutPage';
 
 // Components
 import Navbar from './components/Navbar';
@@ -31,6 +32,7 @@ function AppContent() {
     location.pathname === '/register' || 
     location.pathname === '/login' || 
     location.pathname === '/pricing' || 
+    location.pathname === '/about-us' || 
     location.pathname.startsWith('/admin');
 
   // Redirect logged-in user without active plan to register/payment page
@@ -113,6 +115,7 @@ function AppContent() {
           <Route path="/blogs/:slug" element={<BlogDetailPage />} />
           <Route path="/training" element={<TrainingPage />} />
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/about-us" element={<AboutPage />} />
           {/* Fallback route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -69,7 +69,7 @@ export const watermarkPDF = async (pdfUrl, agent) => {
     const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
     return URL.createObjectURL(blob);
   } catch (err) {
-    console.error('PDF watermarking failed, using original:', err);
-    return pdfUrl;
+    console.error('PDF watermarking failed:', err);
+    throw err;
   }
 };
