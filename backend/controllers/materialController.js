@@ -222,15 +222,25 @@ exports.downloadMaterial = async (req, res) => {
           const matSubCatId = material.subcategoryId?.toString();
           
           let isLeaderContent = false;
+          let ancestorSubCatIds = [];
           
           if (matCatId) {
             const category = await Category.findById(matCatId);
             if (category && category.isLeaderCategory) isLeaderContent = true;
           }
           
-          if (matSubCatId && !isLeaderContent) {
-            const subcategory = await Subcategory.findById(matSubCatId);
-            if (subcategory && subcategory.isLeaderCategory) isLeaderContent = true;
+          if (matSubCatId) {
+            let currSubCat = await Subcategory.findById(matSubCatId);
+            while (currSubCat) {
+              ancestorSubCatIds.push(currSubCat._id.toString());
+              if (currSubCat.isLeaderCategory) isLeaderContent = true;
+              
+              if (currSubCat.parentSubcategoryId) {
+                currSubCat = await Subcategory.findById(currSubCat.parentSubcategoryId);
+              } else {
+                currSubCat = null;
+              }
+            }
           }
 
           // If it's a Leader category, check leader access
@@ -248,7 +258,9 @@ exports.downloadMaterial = async (req, res) => {
             const unlockedCats = user.unlockedCategories?.map(c => c.toString()) || [];
             const addonCats = user.purchasedAddons?.map(c => c.toString()) || [];
             
-            const hasAccess = unlockedCats.includes(matCatId) || addonCats.includes(matCatId) || unlockedCats.includes(matSubCatId) || addonCats.includes(matSubCatId);
+            const hasAccess = unlockedCats.includes(matCatId) || 
+                              addonCats.includes(matCatId) || 
+                              ancestorSubCatIds.some(id => unlockedCats.includes(id) || addonCats.includes(id));
             
             if (!hasAccess && user.role !== 'SuperAdmin' && user.role !== 'SubAdmin') {
               return res.status(403).json({

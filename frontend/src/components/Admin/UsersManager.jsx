@@ -5,10 +5,11 @@ import { Users, X, Info, Edit2, Trash2 } from 'lucide-react';
 export default function UsersManager() {
   const [usersList, setUsersList] = useState([]);
   const [plansList, setPlansList] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [editFormData, setEditFormData] = useState({ name: '', mobile: '', email: '', password: '' });
+  const [editFormData, setEditFormData] = useState({ name: '', mobile: '', email: '', password: '', unlockedCategories: [] });
 
   // Fetch users
   const fetchUsers = async () => {
@@ -36,9 +37,29 @@ export default function UsersManager() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const [catRes, subcatRes] = await Promise.all([
+        API.get('/materials/categories'),
+        API.get('/materials/subcategories')
+      ]);
+      let items = [];
+      if (catRes.data.success) {
+         items = [...items, ...catRes.data.data.filter(c => c.isLeaderCategory)];
+      }
+      if (subcatRes.data.success) {
+         items = [...items, ...subcatRes.data.data.filter(s => s.isMainSubcategory)];
+      }
+      setCategoriesList(items);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchPlans();
+    fetchCategories();
   }, []);
 
   // Update user role or plan
@@ -61,7 +82,8 @@ export default function UsersManager() {
       name: user.name || '',
       mobile: user.mobile || '',
       email: user.email || '',
-      password: '' // empty password by default unless changing
+      password: '', // empty password by default unless changing
+      unlockedCategories: user.unlockedCategories ? user.unlockedCategories.map(c => typeof c === 'object' ? c._id : c) : []
     });
   };
 
@@ -191,7 +213,11 @@ export default function UsersManager() {
                       const uniqueCatsMap = new Map();
                       cats.forEach(c => {
                         const id = typeof c === 'object' ? c._id?.toString() : c.toString();
-                        const name = typeof c === 'object' ? c.name : 'Unknown';
+                        let name = typeof c === 'object' ? c.name : 'Unknown';
+                        if (name === 'Unknown') {
+                          const foundCat = categoriesList.find(catItem => catItem._id === id);
+                          if (foundCat) name = foundCat.name;
+                        }
                         if (id && !uniqueCatsMap.has(id)) uniqueCatsMap.set(id, name);
                       });
                       
@@ -309,6 +335,37 @@ export default function UsersManager() {
                   placeholder="Enter new password"
                 />
               </div>
+              
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-2">Unlocked Categories</label>
+                <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {categoriesList.map(c => {
+                    const isChecked = editFormData.unlockedCategories.includes(c._id);
+                    return (
+                      <div 
+                        key={c._id}
+                        onClick={() => {
+                          if (isChecked) {
+                            setEditFormData(prev => ({ ...prev, unlockedCategories: prev.unlockedCategories.filter(id => id !== c._id) }));
+                          } else {
+                            setEditFormData(prev => ({ ...prev, unlockedCategories: [...prev.unlockedCategories, c._id] }));
+                          }
+                        }}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                          isChecked ? 'border-indigo-500 bg-indigo-500/10' : 'border-white/10 bg-[#0c101c] hover:border-indigo-500/50'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className={`font-bold text-xs ${isChecked ? 'text-indigo-400' : 'text-gray-300'}`}>{c.name}</span>
+                          {isChecked && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Selected</span>}
+                          {!isChecked && c.isLeaderCategory && <span className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full font-bold">Leader</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="pt-2">
                 <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl transition-colors">
                   Save Changes

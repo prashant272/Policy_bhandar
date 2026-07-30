@@ -229,7 +229,8 @@ exports.login = async (req, res) => {
 // @access  Private
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id)
+      .populate('activePlan');
     res.status(200).json({
       success: true,
       data: user
@@ -250,7 +251,7 @@ exports.updateProfile = async (req, res) => {
     const { 
       name, mobile, email, company, occupationType, designation, 
       state, city, selectedCategoryId, selectedSubcategoryId, profilePhotoUrl,
-      whatsappScannerImageUrl, customLink 
+      whatsappScannerImageUrl, customLink, unlockedCategories
     } = req.body;
     
     const updateData = { 
@@ -259,6 +260,24 @@ exports.updateProfile = async (req, res) => {
       selectedCategoryId: selectedCategoryId === '' ? null : selectedCategoryId,
       selectedSubcategoryId: selectedSubcategoryId === '' ? null : selectedSubcategoryId
     };
+
+    const existingUser = await User.findById(req.user.id).populate('activePlan');
+    
+    if (unlockedCategories && Array.isArray(unlockedCategories)) {
+      let mergedCategories = existingUser.unlockedCategories ? existingUser.unlockedCategories.map(c => c.toString()) : [];
+      unlockedCategories.forEach(catId => {
+        if (!mergedCategories.includes(catId)) {
+          mergedCategories.push(catId);
+        }
+      });
+      
+      const maxCategories = existingUser.activePlan ? (existingUser.activePlan.categoryCount || 0) : 0;
+      if (existingUser.activePlan?.name !== 'All Free' && mergedCategories.length > maxCategories) {
+        return res.status(400).json({ success: false, error: 'Aapke plan ki category limit cross ho gayi hai. Please add-on purchase karein.' });
+      }
+      
+      updateData.unlockedCategories = mergedCategories;
+    }
 
     if (req.files && req.files.whatsappScannerPhoto && req.files.whatsappScannerPhoto[0]) {
       updateData.whatsappScannerImage = await uploadFile(req.files.whatsappScannerPhoto[0]);
@@ -275,7 +294,7 @@ exports.updateProfile = async (req, res) => {
     const user = await User.findByIdAndUpdate(req.user.id, updateData, {
       returnDocument: 'after',
       runValidators: true
-    });
+    }).populate('activePlan');
 
     sendTokenResponse(user, 200, res);
   } catch (err) {

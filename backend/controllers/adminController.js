@@ -138,8 +138,6 @@ exports.getUsers = async (req, res) => {
   try {
     const users = await User.find()
       .populate('activePlan')
-      .populate('unlockedCategories', 'name')
-      .populate('purchasedAddons', 'name')
       .sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: users });
   } catch (err) {
@@ -152,7 +150,7 @@ exports.getUsers = async (req, res) => {
 // @access  Private (SuperAdmin)
 exports.updateUser = async (req, res) => {
   try {
-    const { role, subscriptionType, activePlan, name, email, mobile, password } = req.body;
+    const { role, subscriptionType, activePlan, name, email, mobile, password, unlockedCategories } = req.body;
     
     const user = await User.findById(req.params.id);
     if (!user) {
@@ -165,6 +163,9 @@ exports.updateUser = async (req, res) => {
     if (email) user.email = email;
     if (mobile) user.mobile = mobile;
     if (password) user.password = password;
+    if (unlockedCategories && Array.isArray(unlockedCategories)) {
+      user.unlockedCategories = unlockedCategories;
+    }
 
     if (activePlan !== undefined) {
       if (activePlan === null || activePlan === '') {

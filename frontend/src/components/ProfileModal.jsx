@@ -17,13 +17,16 @@ export default function ProfileModal({ isOpen, onClose }) {
     designation: user?.designation || '',
     selectedCategoryId: user?.selectedCategoryId || '',
     selectedSubcategoryId: user?.selectedSubcategoryId || '',
+    unlockedCategories: user?.unlockedCategories ? user.unlockedCategories.map(c => typeof c === 'object' ? c._id : c) : [],
     profilePhotoUrl: '',
     whatsappScannerImageUrl: user?.whatsappScannerImage || '',
     customLink: user?.customLink || ''
   });
 
-  const [categories, setCategories] = useState([]);
-  const [subcategories, setSubcategories] = useState([]);
+  const [initialUnlockedCategories] = useState(user?.unlockedCategories ? user.unlockedCategories.map(c => typeof c === 'object' ? c._id : c) : []);
+  const maxCategories = user?.activePlan?.categoryCount || 0;
+
+  const [availableCategories, setAvailableCategories] = useState([]);
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(user?.profilePhoto ? (user.profilePhoto.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${user.profilePhoto}` : user.profilePhoto) : null);
   
@@ -34,29 +37,29 @@ export default function ProfileModal({ isOpen, onClose }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  // Load Categories on mount
+  // Load Categories and Subcategories on mount
   useEffect(() => {
-    API.get('/materials/categories')
-      .then(res => {
-        if (res.data.success) setCategories(res.data.data);
-      })
-      .catch(err => console.error(err));
+    const fetchCategories = async () => {
+      try {
+        const [catRes, subcatRes] = await Promise.all([
+          API.get('/materials/categories'),
+          API.get('/materials/subcategories')
+        ]);
+        
+        let items = [];
+        if (catRes.data.success) {
+           items = [...items, ...catRes.data.data.filter(c => c.isLeaderCategory)];
+        }
+        if (subcatRes.data.success) {
+           items = [...items, ...subcatRes.data.data.filter(s => s.isMainSubcategory)];
+        }
+        setAvailableCategories(items);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+    fetchCategories();
   }, []);
-
-  // Load Subcategories when Category changes
-  useEffect(() => {
-    if (formData.selectedCategoryId) {
-      API.get(`/materials/categories/${formData.selectedCategoryId}/subcategories`)
-        .then(res => {
-          if (res.data.success) {
-            setSubcategories(res.data.data);
-          }
-        })
-        .catch(err => console.error(err));
-    } else {
-      setSubcategories([]);
-    }
-  }, [formData.selectedCategoryId]);
 
   useEffect(() => {
     if (isOpen && user) {
@@ -71,6 +74,7 @@ export default function ProfileModal({ isOpen, onClose }) {
         designation: user.designation || '',
         selectedCategoryId: user.selectedCategoryId || '',
         selectedSubcategoryId: user.selectedSubcategoryId || '',
+        unlockedCategories: user.unlockedCategories ? user.unlockedCategories.map(c => typeof c === 'object' ? c._id : c) : [],
         profilePhotoUrl: '',
         whatsappScannerImageUrl: user.whatsappScannerImage || '',
         customLink: user.customLink || ''
@@ -101,6 +105,25 @@ export default function ProfileModal({ isOpen, onClose }) {
     }
   };
 
+  const handleCategoryToggle = (categoryId) => {
+    if (initialUnlockedCategories.includes(categoryId)) return; // Cannot toggle already unlocked categories
+
+    setFormData(prev => {
+      const isSelected = prev.unlockedCategories.includes(categoryId);
+      let newCategories = [];
+      if (isSelected) {
+        newCategories = prev.unlockedCategories.filter(id => id !== categoryId);
+      } else {
+        if (user?.activePlan?.name !== 'All Free' && prev.unlockedCategories.length >= maxCategories) {
+          alert('Aapke plan ki category limit cross ho gayi hai. Please add-on purchase karein.');
+          return prev;
+        }
+        newCategories = [...prev.unlockedCategories, categoryId];
+      }
+      return { ...prev, unlockedCategories: newCategories };
+    });
+  };
+
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -127,7 +150,14 @@ export default function ProfileModal({ isOpen, onClose }) {
 
     try {
       const data = new FormData();
-      Object.keys(formData).forEach(key => data.append(key, formData[key]));
+      Object.keys(formData).forEach(key => {
+        if (key === 'unlockedCategories') {
+          // append each category to formData
+          formData[key].forEach(catId => data.append('unlockedCategories[]', catId));
+        } else {
+          data.append(key, formData[key]);
+        }
+      });
       if (photo) {
         data.append('profilePhoto', photo);
       }
@@ -316,20 +346,35 @@ export default function ProfileModal({ isOpen, onClose }) {
               </div>
 
               <div className="group">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 transition-colors group-focus-within:text-orange-600">Primary Category</label>
-                <select name="selectedCategoryId" value={formData.selectedCategoryId} onChange={handleChange} className="block w-full px-4 py-3 border-2 border-slate-100 rounded-2xl bg-slate-50 text-slate-900 font-medium focus:bg-white focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all appearance-none cursor-pointer">
-                  <option value="">Select Category...</option>
-                  {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                </select>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 transition-colors group-focus-within:text-orange-600">
+                  Select Categories {user?.activePlan?.name !== 'All Free' && `(Max: ${maxCategories})`}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                  {availableCategories.map(c => {
+                    const isChecked = formData.unlockedCategories.includes(c._id);
+                    const isDisabled = initialUnlockedCategories.includes(c._id);
+                    
+                    return (
+                     <div 
+                       key={c._id}
+                       onClick={() => !isDisabled && handleCategoryToggle(c._id)}
+                       className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                         isChecked ? 'border-orange-500 bg-orange-50' : 'border-slate-200 hover:border-orange-200'
+                       } ${isDisabled ? 'opacity-70 cursor-not-allowed' : ''}`}
+                     >
+                       <div className="flex justify-between items-center">
+                         <span className={`font-bold text-sm ${isChecked ? 'text-orange-700' : 'text-slate-700'}`}>{c.name}</span>
+                         {isChecked && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Selected</span>}
+                         {!isChecked && c.isLeaderCategory && <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">Leader</span>}
+                       </div>
+                     </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">Note: Once a category is saved, it cannot be removed.</p>
               </div>
 
-              <div className="group">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 transition-colors group-focus-within:text-orange-600">Specialization (Subcategory)</label>
-                <select name="selectedSubcategoryId" value={formData.selectedSubcategoryId} onChange={handleChange} className="block w-full px-4 py-3 border-2 border-slate-100 rounded-2xl bg-slate-50 text-slate-900 font-medium focus:bg-white focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all appearance-none cursor-pointer">
-                  <option value="">Select Subcategory...</option>
-                  {subcategories.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
-                </select>
-              </div>
+
             </div>
 
             <button type="submit" disabled={loading} className="w-full mt-6 bg-gradient-premium hover:bg-gradient-premium-hover text-white py-3 rounded-xl font-bold text-sm tracking-wide shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all flex items-center justify-center">
