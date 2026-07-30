@@ -63,15 +63,16 @@ export const watermarkImage = (imageUrl, agent, template = null, watermarkType =
           }
         });
 
-        const apiBase = `${window.location.protocol}//${window.location.hostname}:5000/api`;
+        const apiBaseUrl = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
+        const apiBase = `${apiBaseUrl}/api`;
 
         // Helper to load image via proxy/fetch
         const loadImageSecurely = async (url) => {
           let proxyUrl = url;
-          if (url.startsWith('http') && !url.includes(window.location.hostname)) {
+          if (url.startsWith('http') && !url.includes(window.location.hostname) && !url.startsWith(apiBaseUrl)) {
             proxyUrl = `${apiBase}/materials/download-proxy?url=${encodeURIComponent(url)}`;
           } else if (url.startsWith('/uploads')) {
-            proxyUrl = `${window.location.protocol}//${window.location.hostname}:5000${url}`;
+            proxyUrl = `${apiBaseUrl}${url}`;
           }
 
           try {
