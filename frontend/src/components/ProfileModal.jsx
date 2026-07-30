@@ -115,7 +115,7 @@ export default function ProfileModal({ isOpen, onClose }) {
         newCategories = prev.unlockedCategories.filter(id => id !== categoryId);
       } else {
         if (user?.activePlan?.name !== 'All Free' && prev.unlockedCategories.length >= maxCategories) {
-          alert('Aapke plan ki category limit cross ho gayi hai. Please add-on purchase karein.');
+          alert('Your plan category limit has been reached. Please purchase an add-on or upgrade your plan.');
           return prev;
         }
         newCategories = [...prev.unlockedCategories, categoryId];

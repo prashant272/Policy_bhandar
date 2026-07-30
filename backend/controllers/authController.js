@@ -272,8 +272,11 @@ exports.updateProfile = async (req, res) => {
       });
       
       const maxCategories = existingUser.activePlan ? (existingUser.activePlan.categoryCount || 0) : 0;
-      if (existingUser.activePlan?.name !== 'All Free' && mergedCategories.length > maxCategories) {
-        return res.status(400).json({ success: false, error: 'Aapke plan ki category limit cross ho gayi hai. Please add-on purchase karein.' });
+      const initialCount = existingUser.unlockedCategories ? existingUser.unlockedCategories.length : 0;
+      const newCategoriesAdded = mergedCategories.length - initialCount;
+      
+      if (existingUser.activePlan?.name !== 'All Free' && newCategoriesAdded > 0 && mergedCategories.length > maxCategories) {
+        return res.status(400).json({ success: false, error: 'Your plan category limit has been reached. Please purchase an add-on or upgrade your plan.' });
       }
       
       updateData.unlockedCategories = mergedCategories;
