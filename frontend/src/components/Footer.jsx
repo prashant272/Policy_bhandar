@@ -171,8 +171,8 @@ export default function Footer({ categories = [] }) {
             © {new Date().getFullYear()} Policy Bhandar. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
-            <a href="#" className="text-xs text-slate-500 font-bold hover:text-orange-500 transition-colors">Privacy Policy</a>
-            <a href="#" className="text-xs text-slate-500 font-bold hover:text-orange-500 transition-colors">Terms of Service</a>
+            <Link to="/privacy-policy" className="text-xs text-slate-500 font-bold hover:text-orange-500 transition-colors">Privacy Policy</Link>
+            <Link to="/terms-and-conditions" className="text-xs text-slate-500 font-bold hover:text-orange-500 transition-colors">Terms of Service</Link>
             <a href="#" className="text-xs text-slate-500 font-bold hover:text-orange-500 transition-colors">Refund Policy</a>
           </div>
         </div>

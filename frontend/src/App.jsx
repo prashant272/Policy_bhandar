@@ -13,6 +13,9 @@ import BlogDetailPage from './pages/BlogDetailPage';
 import TrainingPage from './pages/TrainingPage';
 import PricingPage from './pages/PricingPage';
 import AboutPage from './pages/AboutPage';
+import TermsAndConditionsPage from './pages/TermsAndConditionsPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+
 
 // Components
 import Navbar from './components/Navbar';
@@ -33,6 +36,8 @@ function AppContent() {
     location.pathname === '/login' || 
     location.pathname === '/pricing' || 
     location.pathname === '/about-us' || 
+    location.pathname === '/terms-and-conditions' || 
+    location.pathname === '/privacy-policy' || 
     location.pathname.startsWith('/admin');
 
   // Redirect logged-in user without active plan to register/payment page
@@ -116,6 +121,8 @@ function AppContent() {
           <Route path="/training" element={<TrainingPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/about-us" element={<AboutPage />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           {/* Fallback route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

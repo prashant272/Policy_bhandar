@@ -6,9 +6,9 @@ import { watermarkImage } from '../utils/watermark';
 import { watermarkPDF } from '../utils/pdfWatermark';
 import { Download, Eye, ShieldAlert, Sparkles, FileText, Video, Image as ImageIcon, FileCheck, X } from 'lucide-react';
 
-export default function MaterialCard({ 
-  material, 
-  onOpenAuthModal, 
+export default function MaterialCard({
+  material,
+  onOpenAuthModal,
   onDownloadSuccess,
   activePreviewId,
   setActivePreviewId,
@@ -20,13 +20,13 @@ export default function MaterialCard({
   const { user } = useContext(AuthContext);
   const [downloading, setDownloading] = useState(false);
   const [internalPreviewOpen, setInternalPreviewOpen] = useState(false);
-  
+
   // Watermark Selection State
   const [watermarkSelectionModalOpen, setWatermarkSelectionModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); // 'preview' or 'download'
   const [selectedResolutionForDownload, setSelectedResolutionForDownload] = useState(null);
   const [watermarkType, setWatermarkType] = useState('digicard');
-  
+
   const previewOpen = activePreviewId !== undefined ? activePreviewId === material._id : internalPreviewOpen;
 
   const handleOpenPreviewIntercept = () => {
@@ -88,10 +88,10 @@ export default function MaterialCard({
   React.useEffect(() => {
     if (previewOpen && material.type === 'Banner' && user) {
       const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
-      const proxyUrl = material.fileUrl.startsWith('http') 
-        ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}` 
+      const proxyUrl = material.fileUrl.startsWith('http')
+        ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}`
         : material.fileUrl;
-        
+
       watermarkImage(proxyUrl, user, material.watermarkTemplateId, watermarkType)
         .then(url => setPreviewUrl(url))
         .catch(err => {
@@ -140,13 +140,13 @@ export default function MaterialCard({
       }
 
       const response = await API.post(`/materials/${material._id}/download`, payload);
-      
+
       if (response.data.success) {
         // Handle background job tracking if jobId returned
         if (response.data.data.jobId) {
           const jobId = response.data.data.jobId;
           let downloadTriggered = false;
-          
+
           const pollInterval = setInterval(async () => {
             try {
               const jobResponse = await API.get(`/materials/download-job/${jobId}`);
@@ -159,7 +159,7 @@ export default function MaterialCard({
                   downloadTriggered = true;
                   clearInterval(pollInterval);
                   setDownloadStatus('completed');
-                  
+
                   // Trigger final download
                   const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
                   const directUrl = `${apiBase}/materials/download-direct?file=${encodeURIComponent(job.fileUrl)}&name=${encodeURIComponent(material.title + '-' + material.type + '.mp4')}`;
@@ -194,17 +194,17 @@ export default function MaterialCard({
         }
 
         const fileUrl = response.data.data.fileUrl;
-        
+
         const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
 
         // 2. Perform Watermarking for Banners (Images)
         if (material.type === 'Banner') {
           try {
-              // Apply canvas overlay with template using proxy to avoid CORS
-            const proxyUrl = material.fileUrl.startsWith('http') 
-              ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}` 
+            // Apply canvas overlay with template using proxy to avoid CORS
+            const proxyUrl = material.fileUrl.startsWith('http')
+              ? `${apiBase}/materials/download-proxy?url=${encodeURIComponent(material.fileUrl)}`
               : material.fileUrl;
-              
+
             const watermarkedDataUrl = await watermarkImage(proxyUrl, user, material.watermarkTemplateId, activeWatermarkType);
             await triggerDownload(watermarkedDataUrl, `${material.title}-watermarked.jpg`);
           } catch (err) {
@@ -216,8 +216,8 @@ export default function MaterialCard({
           }
         } else if (material.type === 'PDF' || material.type === 'Brochure') {
           try {
-            const downloadUrl = fileUrl.startsWith('/uploads') 
-              ? `${window.location.protocol}//${window.location.hostname}:5000${fileUrl}` 
+            const downloadUrl = fileUrl.startsWith('/uploads')
+              ? `${window.location.protocol}//${window.location.hostname}:5000${fileUrl}`
               : fileUrl;
             const watermarkedPdfUrl = await watermarkPDF(downloadUrl, user);
             await triggerDownload(watermarkedPdfUrl, `${material.title}-watermarked.pdf`);
@@ -229,7 +229,7 @@ export default function MaterialCard({
           }
         } else {
           const apiBase = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
-          
+
           let ext = 'mp4';
           if (fileUrl) {
             const parts = fileUrl.split('?')[0].split('.');
@@ -239,7 +239,7 @@ export default function MaterialCard({
               ext = 'pptx';
             }
           }
-          
+
           const fileName = `${material.title}-${material.type}.${ext}`;
           const directUrl = `${apiBase}/materials/download-direct?file=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`;
           await triggerDownload(directUrl, fileName);
@@ -256,10 +256,10 @@ export default function MaterialCard({
     } catch (error) {
       console.error('Download error:', error);
       if (error.response?.data?.needsUpgrade) {
-         setErrorMessage(error.response.data.error);
-         setUpgradePrompt(true);
+        setErrorMessage(error.response.data.error);
+        setUpgradePrompt(true);
       } else {
-         alert(error.response?.data?.error || 'Download failed');
+        alert(error.response?.data?.error || 'Download failed');
       }
       setDownloading(false);
       setDownloadStatus('idle');
@@ -315,16 +315,16 @@ export default function MaterialCard({
     const scaleFactor = (tpl.sizeScale || 100) / 100;
     const imgScale = (tpl.imageScale || 100) / 100;
 
-    let wrapperClasses = isMini 
-      ? "absolute z-10 pointer-events-none opacity-90 " 
+    let wrapperClasses = isMini
+      ? "absolute z-10 pointer-events-none opacity-90 "
       : "absolute z-10 pointer-events-none ";
-      
+
     if (tpl.appendMode) {
       wrapperClasses = wrapperClasses.replace('absolute', 'relative').replace('z-10', 'z-0');
     }
-    
-    let innerClasses = isMini 
-      ? "backdrop-blur-sm border rounded-md p-1.5 flex items-center gap-1.5 shadow-xl scale-[0.95] origin-bottom " 
+
+    let innerClasses = isMini
+      ? "backdrop-blur-sm border rounded-md p-1.5 flex items-center gap-1.5 shadow-xl scale-[0.95] origin-bottom "
       : "backdrop-blur-sm border rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-xl ";
 
     switch (tpl.layoutType) {
@@ -354,22 +354,22 @@ export default function MaterialCard({
       return (
         <div className="absolute bottom-0 inset-x-0 bg-white z-10 w-full p-2 sm:p-4 flex items-center shadow-[0_-4px_10px_rgba(0,0,0,0.1)]" style={{ backgroundColor: tpl.backgroundColor || '#fff', borderTop: `2px solid ${tpl.borderColor || '#eee'}` }}>
           {(tpl.showUserPhoto || tpl.logoUrl) && (
-            <div 
+            <div
               className="rounded-xl border-4 overflow-hidden shrink-0 flex items-center justify-center bg-white"
-              style={{ 
+              style={{
                 borderColor: tpl.accentColor || '#000',
                 width: isMini ? `${30 * imgScale}px` : `${70 * imgScale}px`,
                 height: isMini ? `${30 * imgScale}px` : `${70 * imgScale}px`,
               }}
             >
               {tpl.logoUrl ? (
-                <img 
-                  src={tpl.logoUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${tpl.logoUrl}` : tpl.logoUrl} 
-                  className="w-full h-full object-contain p-0.5" 
-                  alt="Logo" 
+                <img
+                  src={tpl.logoUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${tpl.logoUrl}` : tpl.logoUrl}
+                  className="w-full h-full object-contain p-0.5"
+                  alt="Logo"
                 />
               ) : (
-                <div 
+                <div
                   className="w-full h-full flex items-center justify-center font-bold bg-slate-100"
                   style={{ color: tpl.textColor, fontSize: isMini ? `${12 * imgScale}px` : `${28 * imgScale}px` }}
                 >
@@ -378,7 +378,7 @@ export default function MaterialCard({
               )}
             </div>
           )}
-          
+
           <div className="flex-1 ml-3 flex flex-col justify-center leading-tight">
             <span className={isMini ? "text-[5px]" : "text-[10px] sm:text-xs"} style={{ color: tpl.textColor }}>With Best Regards,</span>
             {tpl.showUserName && (
@@ -416,10 +416,10 @@ export default function MaterialCard({
           <div className={wrapperClasses.replace(/bottom-\d+|top-\d+|inset-x-\d+|left-\d+|right-\d+/g, '') + ' w-full relative'} style={{ ...dynamicStyle, transformOrigin: 'top center' }}>
             {/* The watermark content is rendered here inline */}
             <div className="w-full shadow-md" style={{ backgroundColor: tpl.backgroundColor || '#fff', borderTop: `2px solid ${tpl.borderColor || '#eee'}` }}>
-               {/* Note: In appendMode, we just render the basic template UI without absolute positioning */}
-               <div className="p-2 flex items-center justify-center text-xs font-bold text-gray-500 italic">
-                  [Appended Below Image]
-               </div>
+              {/* Note: In appendMode, we just render the basic template UI without absolute positioning */}
+              <div className="p-2 flex items-center justify-center text-xs font-bold text-gray-500 italic">
+                [Appended Below Image]
+              </div>
             </div>
           </div>
         </div>
@@ -428,49 +428,49 @@ export default function MaterialCard({
 
     return (
       <div className={wrapperClasses} style={dynamicStyle}>
-        <div 
+        <div
           className={innerClasses}
           style={{ backgroundColor: tpl.backgroundColor, borderColor: tpl.borderColor }}
         >
           {tpl.logoUrl && (
-            <img 
-              src={tpl.logoUrl.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${tpl.logoUrl}` : tpl.logoUrl} 
-              className={isMini ? "object-contain" : "object-contain"} 
-              style={{ height: isMini ? `${16 * imgScale}px` : `${40 * imgScale}px` }} 
-              alt="Logo" 
+            <img
+              src={tpl.logoUrl.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${tpl.logoUrl}` : tpl.logoUrl}
+              className={isMini ? "object-contain" : "object-contain"}
+              style={{ height: isMini ? `${16 * imgScale}px` : `${40 * imgScale}px` }}
+              alt="Logo"
             />
           )}
 
           {tpl.showUserPhoto && (user.profilePhoto ? (
-            <img 
-              src={user.profilePhoto.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${user.profilePhoto}` : user.profilePhoto} 
+            <img
+              src={user.profilePhoto.startsWith('/uploads') ? `${window.location.protocol}//${window.location.hostname}:5000${user.profilePhoto}` : user.profilePhoto}
               className="rounded-full object-cover shrink-0"
-              style={{ 
-                borderColor: tpl.accentColor, 
+              style={{
+                borderColor: tpl.accentColor,
                 borderWidth: isMini ? '1px' : '2px',
                 width: isMini ? `${24 * imgScale}px` : `${56 * imgScale}px`,
                 height: isMini ? `${24 * imgScale}px` : `${56 * imgScale}px`
-              }} 
+              }}
             />
           ) : (
-            <div 
-              className="rounded-full flex items-center justify-center font-bold shrink-0 bg-slate-800" 
-              style={{ 
-                borderColor: tpl.accentColor, 
+            <div
+              className="rounded-full flex items-center justify-center font-bold shrink-0 bg-slate-800"
+              style={{
+                borderColor: tpl.accentColor,
                 borderWidth: isMini ? '1px' : '2px',
-                color: tpl.textColor, 
+                color: tpl.textColor,
                 width: isMini ? `${24 * imgScale}px` : `${56 * imgScale}px`,
                 height: isMini ? `${24 * imgScale}px` : `${56 * imgScale}px`,
                 fontSize: isMini ? `${9 * imgScale}px` : `${16 * imgScale}px`
               }}>
-                {user.name.charAt(0)}
+              {user.name.charAt(0)}
             </div>
           ))}
-          
+
           <div className="flex-1">
             {tpl.showUserName && <h4 className={isMini ? "font-bold text-[8px] leading-tight" : "font-bold text-sm sm:text-base"} style={{ color: tpl.textColor, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{user.name}</h4>}
             {tpl.showUserDetails && <p className={isMini ? "text-[6px] opacity-90" : "text-[10px] sm:text-xs opacity-90"} style={{ color: tpl.textColor, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{user.agentType || 'Advisor'} | {user.company || 'Policybhandar'}</p>}
-            
+
             {tpl.showSocialIcons && !isMini && (
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="w-3.5 h-3.5 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[7px] font-bold pb-px">f</span>
@@ -480,7 +480,7 @@ export default function MaterialCard({
               </div>
             )}
           </div>
-          
+
           {tpl.showUserMobile && (
             <div className="text-right shrink-0">
               <p className={isMini ? "font-bold text-[7px] whitespace-nowrap" : "font-bold text-xs sm:text-sm whitespace-nowrap"} style={{ color: tpl.accentColor, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Mob: +91 {user.mobile}</p>
@@ -501,11 +501,11 @@ export default function MaterialCard({
   return (
     <div className="glass-effect rounded-2xl overflow-hidden border border-white/5 shadow-lg group hover:border-indigo-500/20 hover:shadow-indigo-500/5 transition-all duration-300">
       {/* Thumbnail Container (Click to Preview) */}
-      <div 
+      <div
         onClick={handleOpenPreviewIntercept}
         className="relative aspect-video w-full overflow-hidden bg-slate-950 cursor-pointer group/thumb"
       >
-        { (material.type === 'Reel' || material.type === 'Video') ? (
+        {(material.type === 'Reel' || material.type === 'Video') ? (
           hasCustomThumbnail() ? (
             <img
               src={material.thumbnail}
@@ -519,7 +519,7 @@ export default function MaterialCard({
               playsInline
               preload="none"
               className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
-              onMouseEnter={e => e.target.play().catch(err => {})}
+              onMouseEnter={e => e.target.play().catch(err => { })}
               onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0; }}
             />
           )
@@ -564,7 +564,7 @@ export default function MaterialCard({
             {getIcon()}
             <span>{material.type}</span>
           </span>
-          
+
           {/* Language Tag */}
           {material.language && material.language !== 'English' && (
             <span className="bg-indigo-600/80 backdrop-blur-md !text-white text-[9px] font-semibold px-1.5 py-0.5 rounded border border-white/10 shadow-lg">
@@ -606,12 +606,12 @@ export default function MaterialCard({
             className="w-full bg-gradient-premium hover:bg-gradient-premium-hover rounded-xl py-2.5 text-xs font-semibold text-white flex items-center justify-center space-x-1.5 shadow-lg shadow-indigo-500/10 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 relative overflow-hidden"
           >
             {downloading && downloadStatus === 'processing' && (
-              <div 
-                className="absolute inset-y-0 left-0 bg-indigo-600/40 transition-all duration-300 pointer-events-none" 
+              <div
+                className="absolute inset-y-0 left-0 bg-indigo-600/40 transition-all duration-300 pointer-events-none"
                 style={{ width: `${downloadProgress}%` }}
               ></div>
             )}
-            
+
             <span className="relative z-10 flex items-center gap-1.5">
               {downloading ? (
                 downloadStatus === 'processing' ? (
@@ -637,12 +637,12 @@ export default function MaterialCard({
       {previewOpen && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-6 bg-slate-950/95 backdrop-blur-md">
           <div className="relative w-[95vw] sm:w-[90vw] max-w-6xl h-[85vh] bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
-            
+
             {/* Top Bar */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 bg-slate-900/50">
               <h3 className="text-lg font-bold text-white line-clamp-1 flex-1 mr-4">{material.title}</h3>
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                
+
                 {/* Prev/Next Navigation */}
                 {(onPrev || onNext) && (
                   <div className="flex bg-white/5 rounded-xl border border-white/10 overflow-hidden hidden sm:flex">
@@ -672,8 +672,8 @@ export default function MaterialCard({
                   className="bg-gradient-premium hover:bg-gradient-premium-hover text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center gap-2 relative overflow-hidden"
                 >
                   {downloading && downloadStatus === 'processing' && (
-                    <div 
-                      className="absolute inset-y-0 left-0 bg-indigo-600/40 transition-all duration-300 pointer-events-none" 
+                    <div
+                      className="absolute inset-y-0 left-0 bg-indigo-600/40 transition-all duration-300 pointer-events-none"
                       style={{ width: `${downloadProgress}%` }}
                     ></div>
                   )}
@@ -709,7 +709,7 @@ export default function MaterialCard({
               {(material.type === 'Reel' || material.type === 'Video') && (
                 <div className="relative h-full max-w-full inline-block">
                   <video src={material.fileUrl} controls autoPlay loop className="max-h-full object-contain" />
-                  
+
                   {/* HTML Overlay Watermark for Reels/Videos (Preview Only) */}
                   {material.type === 'Reel' && renderHTMLOverlay(false)}
                 </div>
@@ -775,7 +775,7 @@ export default function MaterialCard({
                 <Video className="text-indigo-400" size={20} />
                 <span>Select Quality / Resolution</span>
               </h3>
-              <button 
+              <button
                 onClick={() => setResolutionModalOpen(false)}
                 className="text-gray-400 hover:text-white p-1.5 bg-white/5 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
               >
@@ -808,7 +808,7 @@ export default function MaterialCard({
             </div>
 
             <div className="mt-6 flex justify-end">
-              <button 
+              <button
                 onClick={() => setResolutionModalOpen(false)}
                 className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-xl text-sm font-semibold transition-all cursor-pointer"
               >
@@ -826,7 +826,7 @@ export default function MaterialCard({
           <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl shadow-indigo-500/10 relative overflow-hidden">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-white">Qr Code</h3>
-              <button 
+              <button
                 onClick={() => setWatermarkSelectionModalOpen(false)}
                 className="text-gray-400 hover:text-white p-1.5 bg-white/5 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
               >
@@ -838,16 +838,15 @@ export default function MaterialCard({
               {/* DigiCard Option */}
               <button
                 onClick={() => setWatermarkType('digicard')}
-                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                  watermarkType === 'digicard' ? 'border-[#82b440] bg-[#82b440]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
-                }`}
+                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${watermarkType === 'digicard' ? 'border-[#82b440] bg-[#82b440]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
+                  }`}
               >
                 <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-2 p-1">
                   <div className="w-full h-full bg-[#fde68a] rounded flex items-center justify-center overflow-hidden relative">
-                     {/* Pseudo DigiCard Icon */}
-                     <div className="absolute top-1 left-1 w-3 h-3 bg-blue-400 rounded-sm"></div>
-                     <div className="absolute top-1 right-1 w-4 h-1 bg-orange-400 rounded-sm"></div>
-                     <div className="absolute top-2.5 right-1 w-4 h-1 bg-orange-400 rounded-sm"></div>
+                    {/* Pseudo DigiCard Icon */}
+                    <div className="absolute top-1 left-1 w-3 h-3 bg-blue-400 rounded-sm"></div>
+                    <div className="absolute top-1 right-1 w-4 h-1 bg-orange-400 rounded-sm"></div>
+                    <div className="absolute top-2.5 right-1 w-4 h-1 bg-orange-400 rounded-sm"></div>
                   </div>
                 </div>
                 <span className={`text-sm font-medium ${watermarkType === 'digicard' ? 'text-white' : 'text-gray-400'}`}>DigiCard</span>
@@ -856,13 +855,12 @@ export default function MaterialCard({
               {/* WhatsApp Option */}
               <button
                 onClick={() => setWatermarkType('whatsapp')}
-                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                  watermarkType === 'whatsapp' ? 'border-[#25D366] bg-[#25D366]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
-                }`}
+                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${watermarkType === 'whatsapp' ? 'border-[#25D366] bg-[#25D366]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
+                  }`}
               >
                 <div className="w-12 h-12 rounded-full bg-[#25D366] flex items-center justify-center mb-2">
                   <svg viewBox="0 0 24 24" className="w-8 h-8 text-white" fill="currentColor">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
                   </svg>
                 </div>
                 <span className={`text-sm font-medium ${watermarkType === 'whatsapp' ? 'text-[#25D366]' : 'text-gray-400'}`}>WhatsApp</span>
@@ -871,9 +869,8 @@ export default function MaterialCard({
               {/* Other/Link Option */}
               <button
                 onClick={() => setWatermarkType('link')}
-                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                  watermarkType === 'link' ? 'border-[#38bdf8] bg-[#38bdf8]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
-                }`}
+                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all cursor-pointer ${watermarkType === 'link' ? 'border-[#38bdf8] bg-[#38bdf8]/10' : 'border-gray-200/20 hover:border-gray-200/50 bg-white/5'
+                  }`}
               >
                 <div className="w-12 h-12 rounded-lg bg-[#e0f2fe] flex items-center justify-center mb-2">
                   <svg className="w-6 h-6 text-[#0284c7]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
@@ -882,7 +879,7 @@ export default function MaterialCard({
               </button>
             </div>
 
-            <button 
+            <button
               onClick={() => proceedWithAction(watermarkType)}
               className="w-full py-3.5 bg-[#82b440] hover:bg-[#6c9833] text-white rounded-xl font-bold transition-all cursor-pointer active:scale-[0.98] shadow-lg shadow-[#82b440]/30"
             >

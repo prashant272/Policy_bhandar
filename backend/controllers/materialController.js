@@ -74,7 +74,7 @@ exports.getMaterials = async (req, res) => {
     const query = {};
 
     if (categoryId) query.categoryId = categoryId;
-    
+
     if (subcategoryId) {
       const subcategory = await Subcategory.findById(subcategoryId);
       if (subcategory) {
@@ -111,7 +111,7 @@ exports.getMaterials = async (req, res) => {
       }
     }
     if (companyName) query.companyName = { $regex: companyName, $options: 'i' };
-    
+
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -179,7 +179,7 @@ exports.getTags = async (req, res) => {
         query.subcategoryId = subcategoryId.toString();
       }
     }
-    
+
     const tags = await Material.distinct('tags', query);
     res.status(200).json({
       success: true,
@@ -220,21 +220,21 @@ exports.downloadMaterial = async (req, res) => {
           // Access Check
           const matCatId = material.categoryId?.toString();
           const matSubCatId = material.subcategoryId?.toString();
-          
+
           let isLeaderContent = false;
           let ancestorSubCatIds = [];
-          
+
           if (matCatId) {
             const category = await Category.findById(matCatId);
             if (category && category.isLeaderCategory) isLeaderContent = true;
           }
-          
+
           if (matSubCatId) {
             let currSubCat = await Subcategory.findById(matSubCatId);
             while (currSubCat) {
               ancestorSubCatIds.push(currSubCat._id.toString());
               if (currSubCat.isLeaderCategory) isLeaderContent = true;
-              
+
               if (currSubCat.parentSubcategoryId) {
                 currSubCat = await Subcategory.findById(currSubCat.parentSubcategoryId);
               } else {
@@ -257,11 +257,11 @@ exports.downloadMaterial = async (req, res) => {
           if (!isLeaderContent) {
             const unlockedCats = user.unlockedCategories?.map(c => c.toString()) || [];
             const addonCats = user.purchasedAddons?.map(c => c.toString()) || [];
-            
-            const hasAccess = unlockedCats.includes(matCatId) || 
-                              addonCats.includes(matCatId) || 
-                              ancestorSubCatIds.some(id => unlockedCats.includes(id) || addonCats.includes(id));
-            
+
+            const hasAccess = unlockedCats.includes(matCatId) ||
+              addonCats.includes(matCatId) ||
+              ancestorSubCatIds.some(id => unlockedCats.includes(id) || addonCats.includes(id));
+
             if (!hasAccess && user.role !== 'SuperAdmin' && user.role !== 'SubAdmin') {
               return res.status(403).json({
                 success: false,
@@ -321,11 +321,11 @@ exports.downloadMaterial = async (req, res) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
           const outputFilename = `watermarked-${uniqueSuffix}.mp4`;
           const outputPath = path.join(__dirname, '../uploads', outputFilename);
-          
+
           const downloadUrl = material.fileUrl.startsWith('/uploads')
             ? `${req.protocol}://${req.get('host')}${material.fileUrl}`
             : material.fileUrl;
-          
+
           let template = material.watermarkTemplateId;
           if (!template) {
             template = await WatermarkTemplate.findOne().sort({ createdAt: -1 });
@@ -400,11 +400,11 @@ exports.downloadProxy = async (req, res) => {
     if (name) {
       res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
     }
-    
+
     // Add CORS headers so frontend canvas can use it
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    
+
     response.data.pipe(res);
   } catch (err) {
     console.error('Proxy fetch error:', err.message);
@@ -429,7 +429,7 @@ exports.downloadDirect = async (req, res) => {
         method: 'GET',
         responseType: 'stream'
       });
-      
+
       const cleanName = name || path.basename(new URL(file).pathname);
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(cleanName)}"`);
       res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
