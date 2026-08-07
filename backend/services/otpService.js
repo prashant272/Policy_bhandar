@@ -49,70 +49,56 @@ exports.sendEmailOTP = async (toEmail, name, otp) => {
 };
 
 /**
- * Send OTP via WhatsApp Meta API
+ * Send OTP via WhatsApp API
  */
 exports.sendWhatsAppOTP = async (mobileNumber, otp) => {
-  const { WA_PHONE_NUMBER_ID, WA_ACCESS_TOKEN, WA_TEMPLATE_NAME } = process.env;
+  const apiKey = process.env.WA_API_KEY;
+  const fromNumber = process.env.WA_FROM_NUMBER;
 
-  if (!WA_PHONE_NUMBER_ID || !WA_ACCESS_TOKEN) {
-    console.warn('WhatsApp API credentials missing. Mocking WhatsApp OTP:', otp);
+  if (!apiKey || !fromNumber) {
+    console.warn('WhatsApp API key or from number missing. Mocking WhatsApp OTP:', otp);
     return true;
   }
 
   try {
-    // Format mobile number (remove + if exists, ensure it has country code)
+    // Format mobile number (ensure it has +91)
     let formattedNumber = mobileNumber.replace(/[^0-9]/g, '');
     if (formattedNumber.length === 10) {
-      formattedNumber = '91' + formattedNumber; // Default to India if only 10 digits
+      formattedNumber = '+91' + formattedNumber;
+    } else if (!formattedNumber.startsWith('+')) {
+       formattedNumber = '+' + formattedNumber;
     }
 
     const payload = {
-      messaging_product: "whatsapp",
+      from: fromNumber, 
+      campaignName: "api-test", 
       to: formattedNumber,
+      templateName: "otp_verification",
+      otp: otp,
       type: "template",
-      template: {
-        name: WA_TEMPLATE_NAME || "otp_verification",
-        language: {
-          code: "en_US"
-        },
-        components: [
-          {
-            type: "body",
-            parameters: [
-              {
-                type: "text",
-                text: otp
-              }
-            ]
-          },
-          {
-            type: "button",
-            sub_type: "url",
-            index: "0",
-            parameters: [
-              {
-                type: "text",
-                text: otp
-              }
-            ]
-          }
-        ]
+      language: {
+          code: "en_GB"
       }
     };
 
-    await axios.post(
-      `https://graph.facebook.com/v18.0/${WA_PHONE_NUMBER_ID}/messages`,
+    const res = await axios.post(
+      'https://api.aoc-portal.com/v1/whatsapp',
       payload,
       {
         headers: {
-          Authorization: `Bearer ${WA_ACCESS_TOKEN}`,
+          'apikey': apiKey,
           'Content-Type': 'application/json'
         }
       }
     );
 
-    console.log(`WhatsApp OTP sent to ${formattedNumber}`);
-    return true;
+    if (res.data && res.data.message === "Message Sent Successfully!") {
+      console.log(`WhatsApp OTP sent successfully to ${formattedNumber}`);
+      return true;
+    } else {
+      console.error(`WhatsApp OTP failed to send to ${formattedNumber}:`, res.data);
+      return false;
+    }
   } catch (error) {
     console.error('Error sending WhatsApp OTP:', error.response?.data || error.message);
     return false;
