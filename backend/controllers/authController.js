@@ -2,6 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { uploadFile } = require('../config/r2');
 const { sendEmailOTP, sendWhatsAppOTP } = require('../services/otpService');
+// Optional: import anything needed for deleting related data, otherwise just User is fine.
 
 // Helper to sign JWT and return response
 const sendTokenResponse = (user, statusCode, res) => {
@@ -382,3 +383,23 @@ exports.forgotPasswordVerify = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+// @desc    Delete user account
+// @route   DELETE /api/auth/delete-account
+// @access  Private
+exports.deleteAccount = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Perform any other cleanup if necessary (like deleting their files, etc.)
+    await User.findByIdAndDelete(req.user.id);
+
+    res.status(200).json({ success: true, message: 'Account deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+

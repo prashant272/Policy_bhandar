@@ -14,5 +14,6 @@ router.post('/forgot-password-init', forgotPasswordInit);
 router.post('/forgot-password-verify', forgotPasswordVerify);
 router.get('/me', protect, getMe);
 router.put('/profile', protect, upload.fields([{ name: 'profilePhoto', maxCount: 1 }, { name: 'whatsappScannerPhoto', maxCount: 1 }]), updateProfile);
+router.delete('/delete-account', protect, require('../controllers/authController').deleteAccount);
 
 module.exports = router;

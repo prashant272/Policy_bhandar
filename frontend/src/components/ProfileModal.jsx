@@ -1,10 +1,10 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import API from '../services/api';
-import { X, Upload, CheckCircle2, User, Phone, Mail, Building, Briefcase, Link as LinkIcon } from 'lucide-react';
+import { X, Upload, CheckCircle2, User, Phone, Mail, Building, Briefcase, Link as LinkIcon, Trash2 } from 'lucide-react';
 
 export default function ProfileModal({ isOpen, onClose }) {
-  const { user, fetchUser } = useContext(AuthContext);
+  const { user, fetchUser, logout } = useContext(AuthContext);
 
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -183,6 +183,23 @@ export default function ProfileModal({ isOpen, onClose }) {
       setError(err.response?.data?.error || 'Failed to update profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await API.delete('/auth/delete-account');
+        if (res.data.success) {
+          logout();
+          onClose();
+        }
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete account');
+        setLoading(false);
+      }
     }
   };
 
@@ -385,6 +402,18 @@ export default function ProfileModal({ isOpen, onClose }) {
               )}
             </button>
           </form>
+
+          <div className="mt-6 border-t border-slate-100 pt-6">
+            <button 
+              type="button" 
+              onClick={handleDeleteAccount}
+              disabled={loading}
+              className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 py-3 rounded-xl font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2"
+            >
+              <Trash2 size={16} />
+              Delete Account
+            </button>
+          </div>
         </div>
       </div>
     </div>
