@@ -364,7 +364,10 @@ export default function MaterialManager() {
           if (res.data.success) {
             setSubcategories(res.data.data);
             if (res.data.data.length > 0) {
-              setMaterialForm(prev => ({ ...prev, subcategoryId: res.data.data[0]._id }));
+              setMaterialForm(prev => {
+                const exists = res.data.data.some(s => s._id === prev.subcategoryId);
+                return exists ? prev : { ...prev, subcategoryId: res.data.data[0]._id };
+              });
             } else {
               setMaterialForm(prev => ({ ...prev, subcategoryId: '' }));
             }
@@ -381,6 +384,12 @@ export default function MaterialManager() {
         .then(res => {
           if (res.data.success) {
             setPreviewSubcategories(res.data.data);
+            if (res.data.data.length > 0) {
+              setPreviewForm(prev => {
+                const exists = res.data.data.some(s => s._id === prev.subcategoryId);
+                return exists ? prev : { ...prev, subcategoryId: res.data.data[0]._id };
+              });
+            }
           }
         })
         .catch(err => console.error('Error loading preview subcategories:', err));
@@ -421,7 +430,10 @@ export default function MaterialManager() {
       
       if (res.data.success) {
         setMessage('Category assigned successfully!');
-        fetchMaterials(1);
+        
+        // Update local state instead of resetting to page 1
+        setMaterials(prev => prev.map(m => m._id === previewMaterial._id ? res.data.data : m));
+        
         setPreviewMaterial(null); // Close modal
       }
     } catch (err) {
@@ -484,9 +496,18 @@ export default function MaterialManager() {
 
       if (res.data.success) {
         setMessage(editingMaterial ? 'Success: Material updated successfully!' : 'Success: Material uploaded successfully!');
+        
+        if (editingMaterial) {
+          // Update locally to prevent scroll jump
+          setMaterials(prev => prev.map(m => m._id === editingMaterial._id ? res.data.data : m));
+        } else {
+          // If new upload, we might want to refetch to see it at the top
+          fetchMaterials(1);
+          setPage(1);
+        }
+        
         resetForm();
         setActiveSubTab('list');
-        fetchData();
       }
     } catch (err) {
       setMessage(err.response?.data?.error || 'Operation failed');
