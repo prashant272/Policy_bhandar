@@ -13,13 +13,7 @@ const seedData = async () => {
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/policybhandar');
     console.log('MongoDB connected for seeding...');
 
-    // Clear existing data
-    await User.deleteMany();
-    await Category.deleteMany();
-    await Subcategory.deleteMany();
-    await Material.deleteMany();
-
-    console.log('Existing data cleared.');
+    // Note: Data clearing logic removed to prevent accidental deletion
 
     // Create SuperAdmin User
     const adminUser = await User.create({

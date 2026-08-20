@@ -41,6 +41,7 @@ router.delete('/subcategories/:id', deleteSubcategory);
 
 router.get('/materials', getMaterials);
 router.post('/materials', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), uploadMaterial);
+
 router.put('/materials/:id', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), updateMaterial);
 router.delete('/materials/:id', deleteMaterial);
 

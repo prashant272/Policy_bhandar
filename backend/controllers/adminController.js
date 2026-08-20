@@ -2,7 +2,8 @@ const Category = require('../models/Category');
 const Subcategory = require('../models/Subcategory');
 const Material = require('../models/Material');
 const User = require('../models/User');
-const { uploadFile } = require('../config/r2');
+const { uploadFile, s2Client, bucketName, publicUrl } = require('../config/r2');
+const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
 
 // @desc    Create Category
 // @route   POST /api/admin/categories
@@ -225,13 +226,35 @@ exports.getMaterials = async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 20;
     const startIndex = (page - 1) * limit;
     const search = req.query.search || '';
+    const tabType = req.query.tabType || 'main';
+    const fType = req.query.type || '';
+    const fSubcategoryId = req.query.subcategoryId || '';
 
     const query = {};
+    
+    if (tabType === 'thumbnails') {
+      query.title = { $regex: 'thumbnail', $options: 'i' };
+    } else if (tabType === 'main') {
+      query.title = { $not: /thumbnail/i };
+    }
+
+    if (fType) {
+      query.type = fType;
+    }
+
+    if (fSubcategoryId) {
+      query.subcategoryId = fSubcategoryId;
+    }
+
     if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { companyName: { $regex: search, $options: 'i' } },
-        { type: { $regex: search, $options: 'i' } }
+      query.$and = [
+        {
+          $or: [
+            { title: { $regex: search, $options: 'i' } },
+            { companyName: { $regex: search, $options: 'i' } },
+            { type: { $regex: search, $options: 'i' } }
+          ]
+        }
       ];
     }
 
@@ -545,3 +568,5 @@ exports.deleteCoupon = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+

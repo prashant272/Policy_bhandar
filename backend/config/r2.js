@@ -163,5 +163,8 @@ const uploadFile = async (file) => {
 
 module.exports = {
   uploadFile,
-  isR2Configured
+  isR2Configured,
+  s2Client,
+  bucketName,
+  publicUrl
 };

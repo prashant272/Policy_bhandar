@@ -112,6 +112,84 @@ const TagInput = ({ value, onChange, availableTags }) => {
           )}
         </div>
       )}
+
+
+    </div>
+  );
+};
+
+const SearchableSelect = ({ options, value, onChange, placeholder = "-- Select --" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = options.filter(opt => {
+    const textToSearch = opt.cleanName || opt.label;
+    return textToSearch.toLowerCase().startsWith(searchTerm.toLowerCase());
+  });
+  // Sort alphabetically
+  filteredOptions.sort((a, b) => {
+    const nameA = a.cleanName || a.label;
+    const nameB = b.cleanName || b.label;
+    return nameA.localeCompare(nameB);
+  });
+
+  const selectedOption = options.find(o => o.value === value);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <div 
+        className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer flex justify-between items-center"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="truncate pr-2">{selectedOption ? selectedOption.label : placeholder}</span>
+        <span className="text-gray-400 text-[10px]">▼</span>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-[200] w-full bottom-full mb-1 bg-[#0b0f19] border border-white/10 rounded-lg shadow-2xl max-h-64 flex flex-col">
+          <div className="p-2 border-b border-white/10 sticky top-0 bg-[#0b0f19]">
+            <input 
+              type="text" 
+              className="w-full bg-black/30 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+              placeholder="Type to search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="overflow-y-auto flex-1 custom-scrollbar pb-1">
+            <div 
+              className="px-3 py-2 text-xs text-gray-400 hover:bg-white/10 cursor-pointer"
+              onClick={() => { onChange(""); setIsOpen(false); }}
+            >
+              {placeholder}
+            </div>
+            {filteredOptions.map(opt => (
+              <div 
+                key={opt.value}
+                className={`px-3 py-2 text-xs text-white hover:bg-indigo-600 transition-colors cursor-pointer truncate ${value === opt.value ? 'bg-indigo-500/40 font-bold' : ''}`}
+                onClick={() => { onChange(opt.value); setIsOpen(false); }}
+              >
+                {opt.label}
+              </div>
+            ))}
+            {filteredOptions.length === 0 && (
+              <div className="px-3 py-4 text-xs text-gray-500 text-center">No matches found</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -135,11 +213,20 @@ export default function MaterialManager() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // Filter States
+  const [filterType, setFilterType] = useState('');
+  const [filterSubcat, setFilterSubcat] = useState('');
+  const [allClickableSubcategories, setAllClickableSubcategories] = useState([]);
+
   // Edit / Form States
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedThumbnail, setSelectedThumbnail] = useState(null);
+  const [previewMaterial, setPreviewMaterial] = useState(null);
   
+  const [previewForm, setPreviewForm] = useState({ categoryId: '', subcategoryId: '' });
+  const [previewSubcategories, setPreviewSubcategories] = useState([]);
+
   const [materialForm, setMaterialForm] = useState({
     title: '',
     categoryId: '',
@@ -154,13 +241,19 @@ export default function MaterialManager() {
     watermarkTemplateId: ''
   });
 
+
+
   // Fetch materials with pagination
-  const fetchMaterials = async (pageNum = 1, query = searchQuery) => {
+  const fetchMaterials = async (pageNum = 1, query = searchQuery, tab = activeSubTab, fType = filterType, fSubcat = filterSubcat) => {
     try {
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
 
-      const matRes = await API.get(`/admin/materials?page=${pageNum}&limit=20&search=${encodeURIComponent(query)}`);
+      const typeQuery = tab === 'thumbnails' ? '&tabType=thumbnails' : '&tabType=main';
+      const fTypeQuery = fType ? `&type=${fType}` : '';
+      const fSubcatQuery = fSubcat ? `&subcategoryId=${fSubcat}` : '';
+
+      const matRes = await API.get(`/admin/materials?page=${pageNum}&limit=20&search=${encodeURIComponent(query)}${typeQuery}${fTypeQuery}${fSubcatQuery}`);
       if (matRes.data.success) {
         if (pageNum === 1) {
           setMaterials(matRes.data.data);
@@ -191,11 +284,19 @@ export default function MaterialManager() {
     }
     const delayDebounceFn = setTimeout(() => {
       setPage(1);
-      fetchMaterials(1, searchQuery);
+      fetchMaterials(1, searchQuery, activeSubTab, filterType, filterSubcat);
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
+
+  // Handle Dropdown Filter Changes
+  useEffect(() => {
+    if (!isFirstMount.current) {
+      setPage(1);
+      fetchMaterials(1, searchQuery, activeSubTab, filterType, filterSubcat);
+    }
+  }, [filterType, filterSubcat, activeSubTab]);
 
   const observer = useRef();
   const lastMaterialElementRef = useCallback(node => {
@@ -211,7 +312,7 @@ export default function MaterialManager() {
       }
     });
     if (node) observer.current.observe(node);
-  }, [loading, loadingMore, hasMore, searchQuery]);
+  }, [loading, loadingMore, hasMore, searchQuery, activeSubTab]);
 
   // Fetch basic datasets
   const fetchData = async () => {
@@ -240,6 +341,12 @@ export default function MaterialManager() {
       if (wmRes.data.success) {
         setWatermarks(wmRes.data.data);
       }
+
+      // Fetch all subcategories for filtering
+      const subcatsRes = await API.get('/materials/subcategories');
+      if (subcatsRes.data.success) {
+        setAllClickableSubcategories(subcatsRes.data.data.filter(s => s.isClickable));
+      }
     } catch (err) {
       console.error('Error fetching material data:', err);
     }
@@ -266,6 +373,63 @@ export default function MaterialManager() {
         .catch(err => console.error('Error loading form subcategories:', err));
     }
   }, [materialForm.categoryId]);
+
+  // Fetch subcategories when preview form category changes
+  useEffect(() => {
+    if (previewForm.categoryId) {
+      API.get(`/materials/categories/${previewForm.categoryId}/subcategories`)
+        .then(res => {
+          if (res.data.success) {
+            setPreviewSubcategories(res.data.data);
+          }
+        })
+        .catch(err => console.error('Error loading preview subcategories:', err));
+    } else {
+      setPreviewSubcategories([]);
+    }
+  }, [previewForm.categoryId]);
+
+  const openPreview = (mat) => {
+    setPreviewMaterial(mat);
+    setPreviewForm({
+      categoryId: mat.categoryId?._id || mat.categoryId || (categories.length > 0 ? categories[0]._id : ''),
+      subcategoryId: mat.subcategoryId?._id || mat.subcategoryId || ''
+    });
+  };
+
+  const handlePreviewAssign = async () => {
+    if (!previewMaterial) return;
+    setLoading(true);
+    setMessage('');
+    try {
+      const formData = new FormData();
+      formData.append('title', previewMaterial.title || '');
+      formData.append('categoryId', previewForm.categoryId);
+      formData.append('subcategoryId', previewForm.subcategoryId);
+      formData.append('type', previewMaterial.type || 'Banner');
+      formData.append('language', previewMaterial.language || 'English');
+      formData.append('companyName', previewMaterial.companyName || '');
+      formData.append('tags', previewMaterial.tags && Array.isArray(previewMaterial.tags) ? previewMaterial.tags.join(', ') : (previewMaterial.tags || ''));
+      formData.append('isPremium', previewMaterial.isPremium || false);
+      if (previewMaterial.watermarkTemplateId) {
+        formData.append('watermarkTemplateId', previewMaterial.watermarkTemplateId?._id || previewMaterial.watermarkTemplateId);
+      }
+
+      const res = await API.put(`/admin/materials/${previewMaterial._id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      if (res.data.success) {
+        setMessage('Category assigned successfully!');
+        fetchMaterials(1);
+        setPreviewMaterial(null); // Close modal
+      }
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Assign failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle Material Submit
   const handleMaterialSubmit = async (e) => {
@@ -345,6 +509,8 @@ export default function MaterialManager() {
     }
   };
 
+
+
   // Handle Edit Click
   const handleEditClick = (mat) => {
     setEditingMaterial(mat);
@@ -403,7 +569,7 @@ export default function MaterialManager() {
 
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => { setActiveSubTab('list'); setMessage(''); }}
+            onClick={() => { setActiveSubTab('list'); setMessage(''); setPage(1); fetchMaterials(1, searchQuery, 'list'); }}
             className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl border transition-all cursor-pointer ${
               activeSubTab === 'list'
                 ? 'bg-indigo-600/10 border-indigo-500/30 text-indigo-400'
@@ -411,6 +577,18 @@ export default function MaterialManager() {
             }`}
           >
             Manage List
+          </button>
+
+          <button
+            onClick={() => { setActiveSubTab('thumbnails'); setMessage(''); setPage(1); fetchMaterials(1, searchQuery, 'thumbnails'); }}
+            className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl border transition-all cursor-pointer flex items-center space-x-1.5 ${
+              activeSubTab === 'thumbnails'
+                ? 'bg-orange-600/10 border-orange-500/30 text-orange-400'
+                : 'border-white/5 text-gray-400 hover:text-white hover:bg-white/3'
+            }`}
+          >
+            <Image size={14} />
+            <span>Thumbnails</span>
           </button>
           
           <button
@@ -424,6 +602,8 @@ export default function MaterialManager() {
             <Upload size={14} />
             <span>Upload New</span>
           </button>
+
+
 
           {editingMaterial && (
             <button
@@ -452,9 +632,34 @@ export default function MaterialManager() {
       )}
 
       {/* List Sub-tab */}
-      {activeSubTab === 'list' && (
+      {(activeSubTab === 'list' || activeSubTab === 'thumbnails') && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex flex-col sm:flex-row justify-end items-center gap-4">
+            <select
+              value={filterSubcat}
+              onChange={(e) => setFilterSubcat(e.target.value)}
+              className="bg-[#0b1021] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 w-full sm:w-auto shadow-md"
+            >
+              <option value="">All Subcategories</option>
+              {allClickableSubcategories.map(s => (
+                <option key={s._id} value={s._id}>{s.name}</option>
+              ))}
+            </select>
+            
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="bg-[#0b1021] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 w-full sm:w-auto shadow-md"
+            >
+              <option value="">All Types</option>
+              <option value="Banner">Image / Banner</option>
+              <option value="Reel">Reels</option>
+              <option value="Video">Video</option>
+              <option value="PDF">PDF</option>
+              <option value="Brochure">Brochure</option>
+              <option value="PPT">PPT</option>
+            </select>
+
             <input
               type="text"
               placeholder="Search by title, company, type..."
@@ -484,23 +689,29 @@ export default function MaterialManager() {
                   return (
                   <tr key={mat._id} ref={isLastItem ? lastMaterialElementRef : null} className="hover:bg-white/3 transition-colors">
                     <td className="p-4 font-bold text-white flex items-center space-x-3">
-                      {mat.type === 'Reel' || mat.type === 'Video' ? (
-                        <video src={mat.fileUrl} muted preload="none" className="w-10 h-6 object-cover rounded border border-white/10" />
-                      ) : mat.type === 'PDF' || mat.type === 'Brochure' || mat.type === 'PPT' ? (
-                        <div className="w-10 h-6 bg-slate-900 border border-white/10 rounded flex items-center justify-center">
-                          {mat.type === 'PPT' ? (
-                            <FileCheck className="text-orange-400" size={12} />
-                          ) : (
-                            <FileText className="text-red-400" size={12} />
-                          )}
-                        </div>
-                      ) : mat.thumbnail ? (
-                        <img src={mat.thumbnail} alt="" className="w-10 h-6 object-cover rounded border border-white/10" />
-                      ) : (
-                        <div className="w-10 h-6 bg-slate-900 border border-white/10 rounded flex items-center justify-center text-gray-600">
-                          <Image size={12} />
-                        </div>
-                      )}
+                      <div 
+                        className="cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+                        onClick={() => openPreview(mat)}
+                        title="Click to preview"
+                      >
+                        {mat.type === 'Reel' || mat.type === 'Video' ? (
+                          <video src={mat.fileUrl} muted preload="none" className="w-10 h-6 object-cover rounded border border-white/10" />
+                        ) : mat.type === 'PDF' || mat.type === 'Brochure' || mat.type === 'PPT' ? (
+                          <div className="w-10 h-6 bg-slate-900 border border-white/10 rounded flex items-center justify-center">
+                            {mat.type === 'PPT' ? (
+                              <FileCheck className="text-orange-400" size={12} />
+                            ) : (
+                              <FileText className="text-red-400" size={12} />
+                            )}
+                          </div>
+                        ) : mat.thumbnail ? (
+                          <img src={mat.thumbnail} alt="" className="w-10 h-6 object-cover rounded border border-white/10" />
+                        ) : (
+                          <div className="w-10 h-6 bg-slate-900 border border-white/10 rounded flex items-center justify-center text-gray-600">
+                            <Image size={12} />
+                          </div>
+                        )}
+                      </div>
                       <span className="truncate max-w-[180px]">{mat.title}</span>
                     </td>
                     <td className="p-4">
@@ -557,6 +768,161 @@ export default function MaterialManager() {
             </table>
           </div>
         </div>
+        </div>
+      )}
+
+      {/* Bulk Recover Sub-tab */}
+      {activeSubTab === 'bulk-recover' && (
+        <div className="space-y-6">
+          <div className="glass-effect p-6 rounded-2xl border border-white/5 shadow-xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                <Sparkles size={16} className="text-green-400" />
+                <span>Bulk Recover from R2 ({unassignedFiles.length} found)</span>
+              </h3>
+              <button
+                onClick={handleBulkSubmit}
+                disabled={loading || selectedUnassigned.length === 0}
+                className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-green-500/20"
+              >
+                {loading ? 'Assigning...' : `Assign ${selectedUnassigned.length} Selected`}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-white/5 p-4 rounded-xl border border-white/5">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Category</label>
+                <select
+                  value={bulkForm.categoryId}
+                  onChange={e => setBulkForm({ ...bulkForm, categoryId: e.target.value })}
+                  className="w-full bg-[#0b0f19] border border-white/10 rounded-lg py-2 px-3 text-white text-xs focus:outline-none focus:border-green-500"
+                >
+                  {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Subcategory</label>
+                <select
+                  value={bulkForm.subcategoryId}
+                  onChange={e => setBulkForm({ ...bulkForm, subcategoryId: e.target.value })}
+                  className="w-full bg-[#0b0f19] border border-white/10 rounded-lg py-2 px-3 text-white text-xs focus:outline-none focus:border-green-500"
+                >
+                  <option value="">-- Choose Subcategory --</option>
+                  {orderedSubcategories.map(s => (
+                    <option key={s._id} value={s._id}>
+                      {'\u00A0'.repeat(s.depth * 4)}{s.depth > 0 ? '↳ ' : ''}{s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Content Type</label>
+                <select
+                  value={bulkForm.type}
+                  onChange={e => setBulkForm({ ...bulkForm, type: e.target.value })}
+                  className="w-full bg-[#0b0f19] border border-white/10 rounded-lg py-2 px-3 text-white text-xs focus:outline-none focus:border-green-500"
+                >
+                  <option value="Banner">Banner (Image)</option>
+                  <option value="Reel">Reel (Video)</option>
+                  <option value="PDF">PDF / Brochure</option>
+                  <option value="PPT">PPT Presentation</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Company</label>
+                <input
+                  type="text"
+                  placeholder="Optional"
+                  value={bulkForm.companyName}
+                  onChange={e => setBulkForm({ ...bulkForm, companyName: e.target.value })}
+                  className="w-full bg-[#0b0f19] border border-white/10 rounded-lg py-2 px-3 text-white text-xs focus:outline-none focus:border-green-500"
+                />
+              </div>
+            </div>
+
+            {loading && unassignedFiles.length === 0 ? (
+              <div className="flex justify-center p-12">
+                <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : unassignedFiles.length === 0 ? (
+              <div className="text-center p-12 border-2 border-dashed border-white/10 rounded-xl">
+                <Sparkles className="mx-auto text-gray-500 mb-2" size={24} />
+                <p className="text-gray-400 text-sm">No recoverable materials found!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 max-h-[60vh] overflow-y-auto p-2">
+                {unassignedFiles.map(file => {
+                  const isSelected = selectedUnassigned.includes(file._id);
+                  const isVideo = file.fileUrl?.toLowerCase().match(/\.(mp4|mov|webm)$/);
+                  const isPdf = file.fileUrl?.toLowerCase().match(/\.(pdf)$/);
+                  const isPpt = file.fileUrl?.toLowerCase().match(/\.(ppt|pptx)$/);
+                  
+                  return (
+                    <div 
+                      key={file._id}
+                      onClick={() => toggleSelectUnassigned(file._id)}
+                      className={`relative group cursor-pointer rounded-xl overflow-hidden aspect-[4/5] border-2 transition-all ${
+                        isSelected ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'border-transparent bg-white/5 hover:border-white/20'
+                      }`}
+                    >
+                      {/* Background Content */}
+                      {isVideo ? (
+                        <video src={file.fileUrl} className="w-full h-full object-cover" preload="metadata" />
+                      ) : isPdf ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#1e1e1e]">
+                          <FileText size={48} className="text-red-500 mb-2" />
+                          <span className="text-white font-bold text-xs tracking-widest bg-red-600 px-2 py-0.5 rounded">PDF</span>
+                        </div>
+                      ) : isPpt ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#1e1e1e]">
+                          <FileText size={48} className="text-orange-500 mb-2" />
+                          <span className="text-white font-bold text-xs tracking-widest bg-orange-600 px-2 py-0.5 rounded">PPT</span>
+                        </div>
+                      ) : (
+                        <img src={file.thumbnail || file.fileUrl} alt="" className="w-full h-full object-cover" />
+                      )}
+                      
+                      {/* Visual Overlay and Buttons */}
+                      <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                        <div className="absolute inset-0 bg-black/40" />
+                        
+                        <div className="relative z-10 flex flex-col items-center">
+                          {isSelected ? (
+                            <div className="bg-green-500 rounded-full p-1.5 shadow-lg mb-2">
+                              <FileCheck size={20} className="text-white" />
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-white font-bold bg-black/60 px-2 py-1 rounded mb-2">Click anywhere to Select</p>
+                          )}
+                          {!isSelected && (
+                            <button 
+                              type="button"
+                              onMouseDown={(e) => { 
+                                e.preventDefault(); 
+                                e.stopPropagation(); 
+                                setQuickAssignFile(file); 
+                              }}
+                              className="bg-indigo-600 hover:bg-indigo-500 text-[10px] text-white font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center space-x-1 transition-transform hover:scale-105 mt-2 cursor-pointer relative z-20"
+                            >
+                              <Sparkles size={12} />
+                              <span>Quick Assign</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Title Bar */}
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2 z-10">
+                        <p className="text-[10px] text-white truncate" title={file.title}>
+                          {file.title || file.fileUrl?.split('/').pop()}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -763,6 +1129,95 @@ export default function MaterialManager() {
               </span>
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Preview Modal */}
+      {previewMaterial && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="relative bg-[#0b1021] border border-white/10 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="flex justify-between items-center p-4 border-b border-white/10">
+              <h3 className="text-white font-bold truncate pr-4">{previewMaterial.title}</h3>
+              <button 
+                onClick={() => setPreviewMaterial(null)}
+                className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer flex-shrink-0"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-4 flex-1 overflow-auto flex items-center justify-center min-h-[300px] bg-black/50">
+              {previewMaterial.type === 'Reel' || previewMaterial.type === 'Video' ? (
+                <video 
+                  src={previewMaterial.fileUrl} 
+                  controls 
+                  autoPlay 
+                  ref={(el) => { if (el) el.playbackRate = 2.0; }}
+                  className="max-w-full max-h-[60vh] rounded-lg shadow-lg"
+                />
+              ) : previewMaterial.type === 'Banner' || previewMaterial.thumbnail ? (
+                <img 
+                  src={previewMaterial.fileUrl || previewMaterial.thumbnail} 
+                  alt={previewMaterial.title} 
+                  className="max-w-full max-h-[60vh] rounded-lg object-contain shadow-lg"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-gray-400 space-y-4">
+                  {previewMaterial.type === 'PPT' ? (
+                    <FileCheck size={64} className="text-orange-400" />
+                  ) : (
+                    <FileText size={64} className="text-red-400" />
+                  )}
+                  <p className="text-sm">Preview not available for document types.</p>
+                  <a 
+                    href={previewMaterial.fileUrl} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    Download / Open File
+                  </a>
+                </div>
+              )}
+            </div>
+            
+            {/* Quick Assign Panel inside Preview */}
+            <div className="p-4 border-t border-white/10 bg-[#0b0f19] flex flex-col sm:flex-row items-center gap-4 rounded-b-2xl">
+              <div className="flex-1 flex gap-4 w-full">
+                <div className="flex-1 relative z-50">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Category</label>
+                  <select
+                    value={previewForm.categoryId}
+                    onChange={e => setPreviewForm({ ...previewForm, categoryId: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-white text-xs focus:outline-none focus:border-indigo-500 [&>option]:bg-[#0b0f19]"
+                  >
+                    <option value="">-- Select Category --</option>
+                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1 relative z-50">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Subcategory</label>
+                  <SearchableSelect
+                    value={previewForm.subcategoryId}
+                    onChange={(val) => setPreviewForm({ ...previewForm, subcategoryId: val })}
+                    placeholder="-- Select Subcategory --"
+                    options={flattenSubcategoryTree(buildSubcategoryTree(previewSubcategories)).map(s => ({
+                      value: s._id,
+                      label: `${'\u00A0'.repeat(s.depth * 4)}${s.depth > 0 ? '↳ ' : ''}${s.name}`,
+                      cleanName: s.name
+                    }))}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handlePreviewAssign}
+                disabled={loading}
+                className="mt-4 sm:mt-0 px-6 py-2 h-[38px] bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-indigo-500/20 whitespace-nowrap self-end sm:self-end flex items-center justify-center"
+              >
+                {loading ? 'Assigning...' : 'Assign Category'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

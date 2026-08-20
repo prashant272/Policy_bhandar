@@ -178,7 +178,9 @@ exports.completeProfile = async (req, res) => {
 // @access  Public
 exports.login = async (req, res) => {
   try {
-    const { identifier, password } = req.body; // Identifier can be email or mobile
+    let { identifier, password } = req.body; // Identifier can be email or mobile
+    
+    if (identifier) identifier = identifier.trim();
 
     if (!identifier || !password) {
       return res.status(400).json({
