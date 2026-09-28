@@ -16,7 +16,7 @@ import AboutPage from './pages/AboutPage';
 import TermsAndConditionsPage from './pages/TermsAndConditionsPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import DeleteAccountPage from './pages/DeleteAccountPage';
-
+import StarHealthAgentPage from './pages/StarHealthAgentPage';
 
 // Components
 import Navbar from './components/Navbar';
@@ -125,6 +125,7 @@ function AppContent() {
           <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/delete-account" element={<DeleteAccountPage />} />
+          <Route path="/star-health-agent" element={<StarHealthAgentPage />} />
           {/* Fallback route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

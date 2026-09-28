@@ -396,6 +396,23 @@ export default function Navbar({ onOpenProfileModal, categories = [] }) {
                </div>
              </div>
 
+            {/* Our Program Dropdown */}
+            <div className="relative group program-dropdown-container">
+              <button className={`flex items-center space-x-1 ${linkClass}`}>
+                Our Program
+                <ChevronDown size={14} className="transition-colors group-hover:rotate-180" />
+              </button>
+              
+              <div className="absolute top-full left-0 mt-1 w-64 glass-effect border border-white/10 rounded-xl shadow-xl transition-all duration-200 p-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible">
+                <Link 
+                  to="/star-health-agent"
+                  className="flex items-center w-full px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors text-left"
+                >
+                  Become a Star Health Agent
+                </Link>
+              </div>
+            </div>
+
             <Link to="/training" className={linkClass}>Training</Link>
             <Link to="/blogs" className={linkClass}>Blogs</Link>
             <Link to="/pricing" className={linkClass}>Pricing</Link>
@@ -500,6 +517,19 @@ export default function Navbar({ onOpenProfileModal, categories = [] }) {
                   onCloseMenu={() => setIsOpen(false)}
                 />
               ))}
+            </div>
+          </div>
+
+          <div className="px-3 py-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 text-left">Our Program</p>
+            <div className="space-y-1">
+              <Link
+                to="/star-health-agent"
+                onClick={() => setIsOpen(false)}
+                className="block py-2 text-sm font-medium text-gray-300 hover:text-white text-left pl-2 hover:bg-white/5 rounded-md"
+              >
+                Become a Star Health Agent
+              </Link>
             </div>
           </div>
 

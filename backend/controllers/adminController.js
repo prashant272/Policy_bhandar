@@ -363,7 +363,9 @@ exports.updateMaterial = async (req, res) => {
         }
     }
 
-    material = await Material.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    material = await Material.findByIdAndUpdate(req.params.id, updateData, { new: true })
+      .populate('categoryId', 'name')
+      .populate('subcategoryId', 'name');
 
     res.status(200).json({ success: true, data: material });
   } catch (err) {
