@@ -75,6 +75,7 @@ function AppContent() {
   };
 
   const isAdminPath = location.pathname.startsWith('/admin');
+  const isStarHealthAgentPath = location.pathname === '/star-health-agent';
 
   if (isAdminPath) {
     return (
@@ -100,10 +101,12 @@ function AppContent() {
     <div className="min-h-screen flex flex-col justify-between">
       
       {/* Global Navigation */}
-      <Navbar 
-        onOpenProfileModal={() => setIsProfileModalOpen(true)}
-        categories={categories} 
-      />
+      {!isStarHealthAgentPath && (
+        <Navbar 
+          onOpenProfileModal={() => setIsProfileModalOpen(true)}
+          categories={categories} 
+        />
+      )}
 
       {/* Main Content Area */}
       <main className="flex-grow w-full flex flex-col">
@@ -132,7 +135,9 @@ function AppContent() {
       </main>
 
       {/* Global Footer */}
-      <Footer categories={categories} />
+      {!isStarHealthAgentPath && (
+        <Footer categories={categories} />
+      )}
 
       <ProfileModal
         isOpen={isProfileModalOpen}
