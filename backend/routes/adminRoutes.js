@@ -21,7 +21,8 @@ const {
   getCoupons,
   createCoupon,
   updateCoupon,
-  deleteCoupon
+  deleteCoupon,
+  createUser
 } = require('../controllers/adminController');
 const { protect, authorize } = require('../middlewares/auth');
 
@@ -47,6 +48,7 @@ router.delete('/materials/:id', deleteMaterial);
 
 // SuperAdmin only routes
 router.get('/users', authorize('SuperAdmin'), getUsers);
+router.post('/users', authorize('SuperAdmin'), createUser);
 router.put('/users/:id', authorize('SuperAdmin'), updateUser);
 router.delete('/users/:id', authorize('SuperAdmin'), deleteUser);
 router.get('/contacts', authorize('SuperAdmin'), getContacts);

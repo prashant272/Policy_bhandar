@@ -457,29 +457,48 @@ export default function PricingPage() {
               </div>
 
               <div className="flex flex-col gap-3 relative z-10 w-full mt-auto">
-                <button 
-                  onClick={() => handlePaymentClick(plan, 'trial')}
-                  disabled={processingId === plan._id}
-                  className={`flex-1 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer border-2 ${
-                    isPopular 
-                      ? 'bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100 hover:border-orange-300' 
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                  } disabled:opacity-70`}
-                >
-                  <Zap size={14} fill="currentColor" /> Free Trial
-                </button>
-                
-                <button 
-                  onClick={() => handlePaymentClick(plan, 'direct')}
-                  disabled={processingId === plan._id}
-                  className={`flex-1 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
-                    isPopular 
-                      ? 'bg-gradient-premium hover:bg-gradient-premium-hover text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30' 
-                      : 'bg-slate-800 hover:bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/30'
-                  } disabled:opacity-70`}
-                >
-                  <Zap size={14} fill="currentColor" /> Buy Now
-                </button>
+                {(() => {
+                  const isActivePlan = user && (
+                    (user.activePlan && typeof user.activePlan === 'object' && user.activePlan._id === plan._id) || 
+                    user.activePlan === plan._id
+                  );
+                  
+                  if (isActivePlan) {
+                    return (
+                      <div className="flex-1 py-3.5 rounded-xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-600 border-2 border-emerald-200 shadow-sm">
+                        <Check size={18} strokeWidth={3} /> Current Active Plan
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <button 
+                        onClick={() => handlePaymentClick(plan, 'trial')}
+                        disabled={processingId === plan._id}
+                        className={`flex-1 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer border-2 ${
+                          isPopular 
+                            ? 'bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100 hover:border-orange-300' 
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        } disabled:opacity-70`}
+                      >
+                        <Zap size={14} fill="currentColor" /> Free Trial
+                      </button>
+                      
+                      <button 
+                        onClick={() => handlePaymentClick(plan, 'direct')}
+                        disabled={processingId === plan._id}
+                        className={`flex-1 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                          isPopular 
+                            ? 'bg-gradient-premium hover:bg-gradient-premium-hover text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30' 
+                            : 'bg-slate-800 hover:bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/30'
+                        } disabled:opacity-70`}
+                      >
+                        <Zap size={14} fill="currentColor" /> Buy Now
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           );

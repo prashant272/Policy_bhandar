@@ -192,7 +192,7 @@ exports.login = async (req, res) => {
     // Check for user (select password explicitly because it's set to select: false in schema)
     const user = await User.findOne({
       $or: [{ email: identifier }, { mobile: identifier }]
-    }).select('+password');
+    }).select('+password').populate('activePlan');
 
     if (!user) {
       return res.status(401).json({

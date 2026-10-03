@@ -11,6 +11,9 @@ export default function UsersManager() {
   const [editingUser, setEditingUser] = useState(null);
   const [editFormData, setEditFormData] = useState({ name: '', mobile: '', email: '', password: '', unlockedCategories: [] });
 
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [addFormData, setAddFormData] = useState({ name: '', mobile: '', email: '', password: '', role: 'Agent', activePlan: '', unlockedCategories: [] });
+
   // Fetch users
   const fetchUsers = async () => {
     setLoading(true);
@@ -105,6 +108,22 @@ export default function UsersManager() {
     }
   };
 
+  const handleAddSubmit = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    try {
+      const res = await API.post('/admin/users', addFormData);
+      if (res.data.success) {
+        setMessage('Success: User added successfully!');
+        setIsAddingUser(false);
+        setAddFormData({ name: '', mobile: '', email: '', password: '', role: 'Agent', activePlan: '', unlockedCategories: [] });
+        fetchUsers();
+      }
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Failed to add user');
+    }
+  };
+
   const handleDeleteUser = async (userId) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     setMessage('');
@@ -123,12 +142,20 @@ export default function UsersManager() {
     <div className="space-y-6">
       
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold text-white flex items-center space-x-2">
-          <Users className="text-indigo-400" size={22} />
-          <span>Users & Plans Management</span>
-        </h2>
-        <p className="text-xs text-gray-400 mt-1">Control advisor system accounts, change system permission roles, and adjust premium subscription plans.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center space-x-2">
+            <Users className="text-indigo-400" size={22} />
+            <span>Users & Plans Management</span>
+          </h2>
+          <p className="text-xs text-gray-400 mt-1">Control advisor system accounts, change system permission roles, and adjust premium subscription plans.</p>
+        </div>
+        <button 
+          onClick={() => setIsAddingUser(true)}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-xl transition-colors shrink-0"
+        >
+          + Add New User
+        </button>
       </div>
 
       {/* Message Prompt */}
@@ -369,6 +396,81 @@ export default function UsersManager() {
               <div className="pt-2">
                 <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl transition-colors">
                   Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {isAddingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#0b1021] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="flex justify-between items-center p-4 border-b border-white/10 bg-white/5">
+              <h3 className="text-lg font-bold text-white">Add New User</h3>
+              <button onClick={() => setIsAddingUser(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAddSubmit} className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={addFormData.name}
+                  onChange={(e) => setAddFormData({...addFormData, name: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Mobile</label>
+                <input
+                  type="text"
+                  value={addFormData.mobile}
+                  onChange={(e) => setAddFormData({...addFormData, mobile: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={addFormData.email}
+                  onChange={(e) => setAddFormData({...addFormData, email: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={addFormData.password}
+                  onChange={(e) => setAddFormData({...addFormData, password: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Role</label>
+                <select
+                  value={addFormData.role}
+                  onChange={(e) => setAddFormData({...addFormData, role: e.target.value})}
+                  className="w-full bg-[#0c101c] border border-white/10 text-sm rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="Agent">Agent</option>
+                  <option value="Leader">Leader</option>
+                  <option value="SubAdmin">SubAdmin</option>
+                  <option value="SuperAdmin">SuperAdmin</option>
+                </select>
+              </div>
+
+              <div className="pt-2">
+                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl transition-colors">
+                  Add User
                 </button>
               </div>
             </form>

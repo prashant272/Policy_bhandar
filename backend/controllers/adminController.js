@@ -188,6 +188,11 @@ exports.updateUser = async (req, res) => {
           user.isVerified = true;
           user.otp = undefined;
           user.otpExpires = undefined;
+          
+          user.subscriptionStatus = 'active';
+          if (planDoc.isLeaderIncluded) {
+            user.hasLeaderAccess = true;
+          }
         }
       }
     }
@@ -571,4 +576,35 @@ exports.deleteCoupon = async (req, res) => {
   }
 };
 
+// @desc    Create User (Directly from Admin)
+// @route   POST /api/admin/users
+// @access  Private (SuperAdmin)
+exports.createUser = async (req, res) => {
+  try {
+    const { name, mobile, email, password, role, activePlan, unlockedCategories } = req.body;
+    
+    if (!name || !mobile || !email || !password) {
+      return res.status(400).json({ success: false, error: 'Please provide all required fields (name, mobile, email, password)' });
+    }
 
+    let user = await User.findOne({ $or: [{ email }, { mobile }] });
+    if (user) {
+      return res.status(400).json({ success: false, error: 'User with this email or mobile already exists' });
+    }
+
+    user = await User.create({
+      name,
+      mobile,
+      email,
+      password,
+      role: role || 'Agent',
+      activePlan: activePlan || null,
+      unlockedCategories: unlockedCategories || [],
+      isVerified: true
+    });
+
+    res.status(201).json({ success: true, data: user });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};

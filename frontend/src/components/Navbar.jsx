@@ -445,7 +445,7 @@ export default function Navbar({ onOpenProfileModal, categories = [] }) {
                       <p className="text-sm font-semibold text-white">{user.name}</p>
                       <p className="text-xs text-gray-400 truncate">{user.email}</p>
                       <p className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded px-1.5 py-0.5 inline-block mt-1 uppercase tracking-wider font-bold">
-                        {user.role} - {user.subscriptionType}
+                        {user.role} - {user.activePlan?.name || user.subscriptionType || 'Free'}
                       </p>
                     </div>
 
