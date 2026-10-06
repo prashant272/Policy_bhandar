@@ -39,6 +39,7 @@ app.use('/api/trainings', require('./routes/trainingRoutes'));
 app.use('/api/plans', require('./routes/planRoutes'));
 app.use('/api/settings', require('./routes/settingRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/webinar', require('./routes/webinarRoutes'));
 // Inline Contact Inquiry Route
 app.post('/api/contacts', async (req, res) => {
   try {

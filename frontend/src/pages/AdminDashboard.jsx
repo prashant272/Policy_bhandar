@@ -11,6 +11,8 @@ import PlanManager from '../components/Admin/PlanManager';
 import LeadsManager from '../components/Admin/LeadsManager';
 import CouponManager from '../components/Admin/CouponManager';
 
+import WebinarLeadsManager from '../components/Admin/WebinarLeadsManager';
+
 export default function AdminDashboard() {
   const { user, logout } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('categories'); // Default 1st tab is Category Management
@@ -33,6 +35,8 @@ export default function AdminDashboard() {
         return <PlanManager />;
       case 'leads':
         return <LeadsManager />;
+      case 'webinar':
+        return <WebinarLeadsManager />;
       case 'coupons':
         return <CouponManager />;
       default:

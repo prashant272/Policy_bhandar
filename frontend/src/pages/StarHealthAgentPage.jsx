@@ -83,21 +83,71 @@ export default function StarHealthAgentPage() {
     setIsSubmitting(true);
     setStatusMsg('');
     try {
-      const fullMessage = `Service Type: Agent Recruitment & Growth | Specific Requirements: Star Health Agent Webinar Registration (Occupation: ${formData.occupation})`;
-      await API.post('/contacts', {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        message: fullMessage,
-        source: 'Star Health Agent Page'
+      // Create Razorpay Order
+      const res = await API.post('/webinar/register', formData);
+      if (!res.data.success) {
+        setStatusMsg('Error: ' + (res.data.error || 'Failed to initialize payment'));
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { orderId, amount, currency, registrationId, key } = res.data;
+
+      const options = {
+        key: key,
+        amount: amount,
+        currency: currency,
+        name: 'PolicyBhandar',
+        description: 'Star Health Webinar Registration',
+        order_id: orderId,
+        handler: async function (response) {
+          try {
+            // Verify Payment
+            const verifyRes = await API.post('/webinar/verify', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              registrationId: registrationId
+            });
+
+            if (verifyRes.data.success) {
+              setStatusMsg('Payment successful! Your seat is reserved.');
+              alert('Registration and payment successful! Our team will contact you with the meeting link.');
+              setFormData({ name: '', email: '', phone: '', occupation: '' });
+            } else {
+              setStatusMsg('Error: Payment verification failed.');
+            }
+          } catch (err) {
+            console.error('Verify error:', err);
+            setStatusMsg('Error: Payment verification failed.');
+          }
+        },
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone
+        },
+        theme: {
+          color: '#fbbf24'
+        }
+      };
+
+      if (!window.Razorpay) {
+        setStatusMsg('Error: Razorpay SDK not loaded. Please check your internet connection.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (response) {
+        console.error(response.error);
+        setStatusMsg('Error: Payment failed or cancelled.');
       });
-      setStatusMsg('Registration successful! Our team will contact you.');
-      alert('Registration successful! Our team will contact you.');
-      setFormData({ name: '', email: '', phone: '', occupation: '' });
-      setTimeout(() => setStatusMsg(''), 5000);
+      rzp.open();
+
     } catch (error) {
+      console.error('Registration error:', error);
       setStatusMsg('Error: Registration failed. Please try again.');
-      alert('Error: Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
