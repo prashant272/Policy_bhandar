@@ -675,6 +675,7 @@ export default function MaterialManager() {
               <option value="">All Types</option>
               <option value="Banner">Image / Banner</option>
               <option value="Reel">Reels</option>
+              <option value="AI Reels">AI Reels</option>
               <option value="Video">Video</option>
               <option value="PDF">PDF</option>
               <option value="Brochure">Brochure</option>
@@ -715,7 +716,7 @@ export default function MaterialManager() {
                         onClick={() => openPreview(mat)}
                         title="Click to preview"
                       >
-                        {mat.type === 'Reel' || mat.type === 'Video' ? (
+                        {mat.type === 'Reel' || mat.type === 'AI Reels' || mat.type === 'Video' ? (
                           <video src={mat.fileUrl} muted preload="none" className="w-10 h-6 object-cover rounded border border-white/10" />
                         ) : mat.type === 'PDF' || mat.type === 'Brochure' || mat.type === 'PPT' ? (
                           <div className="w-10 h-6 bg-slate-900 border border-white/10 rounded flex items-center justify-center">
@@ -845,6 +846,7 @@ export default function MaterialManager() {
                 >
                   <option value="Banner">Banner (Image)</option>
                   <option value="Reel">Reel (Video)</option>
+                  <option value="AI Reels">AI Reels</option>
                   <option value="PDF">PDF / Brochure</option>
                   <option value="PPT">PPT Presentation</option>
                 </select>
@@ -1020,6 +1022,7 @@ export default function MaterialManager() {
                 >
                   <option value="Banner">Banner (Image)</option>
                   <option value="Reel">Reel (Video)</option>
+                  <option value="AI Reels">AI Reels</option>
                   <option value="PDF">PDF / Brochure</option>
                   <option value="PPT">PPT Presentation</option>
                   <option value="Video">Video Link</option>
@@ -1045,7 +1048,7 @@ export default function MaterialManager() {
                 <select
                   value={materialForm.watermarkTemplateId}
                   onChange={e => setMaterialForm({ ...materialForm, watermarkTemplateId: e.target.value })}
-                  disabled={materialForm.type !== 'Banner' && materialForm.type !== 'Reel'}
+                  disabled={materialForm.type !== 'Banner' && materialForm.type !== 'Reel' && materialForm.type !== 'AI Reels'}
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [&>option]:bg-[#0b0f19] disabled:opacity-50"
                 >
                   <option value="">-- No Watermark / Default --</option>
@@ -1053,7 +1056,7 @@ export default function MaterialManager() {
                     <option key={wm._id} value={wm._id}>{wm.name}</option>
                   ))}
                 </select>
-                <p className="text-[10px] text-gray-500 mt-1">Only applicable for Banners and Reels</p>
+                <p className="text-[10px] text-gray-500 mt-1">Only applicable for Banners, Reels and AI Reels</p>
               </div>
 
               <div className="relative z-10 md:col-span-2">
@@ -1168,7 +1171,7 @@ export default function MaterialManager() {
             </div>
             
             <div className="p-4 flex-1 overflow-auto flex items-center justify-center min-h-[300px] bg-black/50">
-              {previewMaterial.type === 'Reel' || previewMaterial.type === 'Video' ? (
+              {previewMaterial.type === 'Reel' || previewMaterial.type === 'AI Reels' || previewMaterial.type === 'Video' ? (
                 <video 
                   src={previewMaterial.fileUrl} 
                   controls 

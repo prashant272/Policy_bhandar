@@ -59,7 +59,7 @@ export default function MaterialCard({
       else setInternalPreviewOpen(true);
     } else if (pendingAction === 'download') {
       // Re-trigger download logic bypassing interception
-      if ((material.type === 'Reel' || material.type === 'Video') && !selectedResolutionForDownload) {
+      if ((material.type === 'Reel' || material.type === 'AI Reels' || material.type === 'Video') && !selectedResolutionForDownload) {
         setResolutionModalOpen(true);
       } else {
         performDownload(selectedResolutionForDownload, selectedType);
@@ -107,6 +107,7 @@ export default function MaterialCard({
     switch (material.type) {
       case 'Banner': return <ImageIcon className="text-blue-400" size={16} />;
       case 'Reel':
+      case 'AI Reels':
       case 'Video': return <Video className="text-pink-400" size={16} />;
       case 'PDF':
       case 'Brochure': return <FileText className="text-red-400" size={16} />;
@@ -132,7 +133,7 @@ export default function MaterialCard({
     try {
       // 1. Call API to check/increment download count
       const payload = { watermarkType: activeWatermarkType };
-      if (material.type === 'Reel' || material.type === 'Video') {
+      if (material.type === 'Reel' || material.type === 'AI Reels' || material.type === 'Video') {
         payload.resolution = resolution;
         console.log('Sending download request with resolution:', resolution);
       } else {
@@ -295,7 +296,7 @@ export default function MaterialCard({
   };
 
   const renderHTMLOverlay = (isMini = false) => {
-    if (!user || (material.type !== 'Banner' && material.type !== 'Reel')) return null;
+    if (!user || (material.type !== 'Banner' && material.type !== 'Reel' && material.type !== 'AI Reels')) return null;
 
     const tpl = material.watermarkTemplateId || {
       layoutType: 'bottom-bar',
@@ -494,7 +495,7 @@ export default function MaterialCard({
   const hasCustomThumbnail = () => {
     if (!material.thumbnail) return false;
     if (material.thumbnail.includes('unsplash.com') || material.thumbnail.includes('placeholder.com')) return false;
-    if (material.thumbnail === material.fileUrl && (material.type === 'Reel' || material.type === 'Video')) return false;
+    if (material.thumbnail === material.fileUrl && (material.type === 'Reel' || material.type === 'AI Reels' || material.type === 'Video')) return false;
     return true;
   };
 
@@ -505,7 +506,7 @@ export default function MaterialCard({
         onClick={handleOpenPreviewIntercept}
         className="relative aspect-video w-full overflow-hidden bg-slate-950 cursor-pointer group/thumb"
       >
-        {(material.type === 'Reel' || material.type === 'Video') ? (
+        {(material.type === 'Reel' || material.type === 'AI Reels' || material.type === 'Video') ? (
           hasCustomThumbnail() ? (
             <img
               src={material.thumbnail}
@@ -706,12 +707,12 @@ export default function MaterialCard({
               {material.type === 'Banner' && (
                 <img src={previewUrl} alt={material.title} className="max-w-full max-h-full object-contain drop-shadow-2xl" />
               )}
-              {(material.type === 'Reel' || material.type === 'Video') && (
+              {(material.type === 'Reel' || material.type === 'AI Reels' || material.type === 'Video') && (
                 <div className="relative h-full max-w-full inline-block">
                   <video src={material.fileUrl} controls autoPlay loop className="max-h-full object-contain" />
 
                   {/* HTML Overlay Watermark for Reels/Videos (Preview Only) */}
-                  {material.type === 'Reel' && renderHTMLOverlay(false)}
+                  {(material.type === 'Reel' || material.type === 'AI Reels') && renderHTMLOverlay(false)}
                 </div>
               )}
               {(material.type === 'PDF' || material.type === 'Brochure') && (
@@ -734,7 +735,7 @@ export default function MaterialCard({
             <div className="p-3 border-t border-white/10 bg-slate-900 flex items-center justify-between text-xs text-gray-400">
               <span>Type: {material.type}</span>
               <span>
-                {material.type === 'Reel' ? 'Watermark shown in preview is for demo.' : 'Watermark is applied automatically on download.'}
+                {(material.type === 'Reel' || material.type === 'AI Reels') ? 'Watermark shown in preview is for demo.' : 'Watermark is applied automatically on download.'}
               </span>
             </div>
           </div>

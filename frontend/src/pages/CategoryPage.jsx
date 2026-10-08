@@ -218,6 +218,7 @@ export default function CategoryPage({ onOpenAuthModal }) {
             { name: 'Recent', value: '' },
             { name: 'Banners (Images)', value: 'Banner' },
             { name: 'Reels & Videos', value: 'Reel,Video' },
+            { name: 'AI Reels', value: 'AI Reels' },
             { name: 'PDFs & Brochures', value: 'PDF,Brochure' },
             { name: 'PPT Presentations', value: 'PPT' }
           ].map((fmt) => (

@@ -18,7 +18,7 @@ const MaterialSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Banner', 'Reel', 'PDF', 'PPT', 'Video', 'Brochure'],
+    enum: ['Banner', 'Reel', 'AI Reels', 'PDF', 'PPT', 'Video', 'Brochure'],
     required: [true, 'Please specify the material type']
   },
   language: {

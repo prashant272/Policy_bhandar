@@ -178,10 +178,10 @@ export default function StarHealthAgentPage() {
               </div>
               
               {/* Headline */}
-              <h1 className="text-4xl md:text-5xl lg:text-[54px] font-extrabold leading-[1.1] tracking-tight animate-letter-join" style={{ color: '#ffffff' }}>
+              <h1 className="text-4xl md:text-5xl lg:text-[54px] font-extrabold leading-[1.1] tracking-tight" style={{ color: '#ffffff' }}>
                 Become a Star Health <br className="hidden md:block"/>
                 Insurance Agent <span style={{ color: '#fbbf24' }}>& Build</span> <br className="hidden md:block"/>
-                <span className="animate-typing" style={{ color: '#fbbf24' }}>a High-Income Career</span>
+                <span style={{ color: '#fbbf24' }}>a High-Income Career</span>
               </h1>
               
               <p className="text-base md:text-lg max-w-2xl font-medium leading-relaxed" style={{ color: '#dbeafe' }}>
